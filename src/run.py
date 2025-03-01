@@ -3,7 +3,6 @@ from src.Dataset.antique import Antique
 from src.Dataset.nfcorpus import NFCorpus
 from src.Dataset.scidocs import Scidocs
 from src.Embedding.embedding import create_embeddings, load_embeddings
-from src.GPUCB.gpucb import GPUCB
 import numpy as np
 
 # pipeline kwargs

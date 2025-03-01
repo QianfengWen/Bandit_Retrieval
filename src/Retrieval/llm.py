@@ -1,3 +1,5 @@
+import pdb
+
 class LLM:
     """
     Simple LLM interface for scoring passages based on relevance to a query.
@@ -29,19 +31,9 @@ class LLM:
         """
         # If ground truth is provided and we have IDs, use it
         if self.relevance_map and query_id is not None and passage_id is not None:
-            if (query_id, passage_id) in self.relevance_map:
-                return self.relevance_map[(query_id, passage_id)]
+            if query_id in self.relevance_map and passage_id in self.relevance_map[query_id]:
+                return self.relevance_map[query_id][passage_id]
+            elif query_id not in self.relevance_map:
+                raise ValueError(f"No relevance map found for query_id: {query_id}")
         
-        # In a real implementation, we would call an actual LLM API here
-        # For now, implement a simple similarity measure based on term overlap
-        query_terms = set(query.lower().split())
-        passage_terms = set(passage.lower().split())
-        
-        # Simple Jaccard similarity
-        if not query_terms or not passage_terms:
-            return 0.0
-        
-        intersection = len(query_terms.intersection(passage_terms))
-        union = len(query_terms.union(passage_terms))
-        
-        return intersection / union 
+        return 0.0
