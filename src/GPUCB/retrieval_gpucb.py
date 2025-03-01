@@ -1,181 +1,352 @@
+import torch
+import gpytorch
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
-import matplotlib.pyplot as plt
-import pdb
+
+
+class ExactGPModel(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, kernel):
+        """
+        Exact Gaussian Process model for passage retrieval.
+
+        Args:
+            train_x (torch.Tensor): Training input features.
+            train_y (torch.Tensor): Training target values (relevance scores).
+            likelihood (gpytorch.likelihoods.GaussianLikelihood): GP likelihood.
+            kernel (gpytorch.kernels.Kernel): GP kernel function.
+        """
+        super().__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(kernel)
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
 
 class RetrievalGPUCB:
     """
-    GP-UCB implementation specifically for retrieval tasks.
+    GP-UCB implementation for passage retrieval using GPyTorch, optimized for CUDA.
     """
-    
-    def __init__(self, beta=2.0, kernel='rbf'):
+
+    def __init__(self, beta=2.0, kernel="rbf", use_cuda=True):
         """
-        Initialize the GP-UCB algorithm for retrieval
-        
+        Initialize the GP-UCB model with GPyTorch.
+
         Args:
-            beta: Exploration parameter that balances exploitation vs exploration
-            is_embeddings_based: Whether to use embeddings (True) or indices (False) as features
+            beta (float): Exploration-exploitation tradeoff parameter.
+            kernel (str): Kernel type ('rbf', 'matern', 'rq' for RationalQuadratic).
+            use_cuda (bool): Whether to use CUDA (if available).
         """
         self.beta = beta
         self.is_fitted = False
-        # Observations
-        self.X = []  # Features of observed points (indices or embeddings)
-        self.y = []  # Rewards (relevance scores) observed so far
-        
-        # Setup GP regressor with appropriate kernel: 
-        # 1. RBF
+        self.device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
+
+        # Observations (stored as tensors)
+        self.X = []
+        self.y = []
+
+        # Define Kernel
         if kernel == "rbf":
-            kernel = C(1.0) * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
-        # 2. Matern
-        elif kernel == 'matern':
-            kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
-        # 3. Rational Quadratic
-        elif kernel == 'rational_quadratic':
-            kernel = C(1.0) * RationalQuadratic(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
-        # 4. Exponential
-        elif kernel == 'exp_sine_squared':
-            kernel = C(1.0) * ExpSineSquared(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
-        # 5. Dot Product
-        elif kernel == 'dot_product':
-            kernel = C(1.0) * DotProduct()
-        
-            
-        self.gp = GaussianProcessRegressor(
-            kernel=kernel,
-            alpha=1e-6,  # Small noise to avoid numerical issues
-            normalize_y=True,
-            n_restarts_optimizer=5
-        )
-    
+            self.kernel = gpytorch.kernels.RBFKernel()
+        elif kernel == "matern":
+            self.kernel = gpytorch.kernels.MaternKernel(nu=2.5)  
+        elif kernel == "rq":
+            self.kernel = gpytorch.kernels.RQKernel() 
+        else:
+            raise ValueError("Unsupported kernel type. Choose 'rbf', 'matern', or 'rq'.")
+
+        self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(self.device)
+        self.gp_model = None  
+
     def update(self, x, reward):
         """
-        Update the GP model with a new observation
+        Update the GP model with a new observation.
         
         Args:
-            x: The feature of the selected candidate (index or embedding)
-            reward: The observed reward (relevance score)
+            x (torch.Tensor or array-like): The feature of the selected passage-query candidate.
+            reward (float): The observed reward (LLM relevance score).
         """
-        x_processed = self._process_x(x)
-        self.X.append(x_processed)  # Add the flattened array
-        self.y.append(reward)
-        # Mark that model needs refitting after new data
-        self.is_fitted = False
-    
+        x_tensor = self._process_x(x)
+        reward_tensor = torch.tensor([reward], dtype=torch.float32, device=self.device)
+
+        self.X.append(x_tensor)
+        self.y.append(reward_tensor)
+
+        self.is_fitted = False  # Mark that the model needs refitting
+
     def _process_x(self, candidates):
         """
-        Process candidates into appropriate format for GP
-        
-        Args:
-            candidates: List of candidates (indices or embeddings), already a numpy array
-            
-        Returns:
-            Numpy array of processed candidates
+        Convert candidates into PyTorch tensor format.
         """
-        # convert to numpy array if not already):
-        if not isinstance(candidates, np.ndarray):
-            candidates = np.array(candidates)
-        
-        # Ensure proper dimensionality (2D: samples × features)
-        if candidates.ndim == 1:
-            # If 1D, add a dimension to make it 2D
-            candidates = candidates.reshape(1, -1)
-            
-        return candidates
-    
-    def _process_candidates(self, candidates):
-        if isinstance(candidates, list):
-            candidates = np.array(candidates)
+        if not isinstance(candidates, torch.Tensor):
+            candidates = torch.tensor(candidates, dtype=torch.float32, device=self.device)
 
         if candidates.ndim == 1:
-            candidates = candidates.reshape(-1, 1)
+            candidates = candidates.view(1, -1)  # Ensure 2D format
+
         return candidates
-            
+
+    def _fit_gp(self):
+        """
+        Train the GP model using Exact GP.
+        """
+        if not self.X:
+            return  # No data to fit
+
+        # Convert list to tensor
+        X_train = torch.cat(self.X, dim=0)
+        y_train = torch.cat(self.y, dim=0)
+
+        # Create Exact GP Model
+        self.gp_model = ExactGPModel(X_train, y_train, self.likelihood, self.kernel).to(self.device)
+        self.gp_model.train()
+        self.likelihood.train()
+
+        # GP Optimization using L-BFGS-B
+        optimizer = torch.optim.LBFGS(self.gp_model.parameters(), max_iter=50)
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gp_model)
+
+        def closure():
+            optimizer.zero_grad()
+            output = self.gp_model(X_train)
+            loss = -mll(output, y_train)
+            loss.backward()
+            return loss
+
+        optimizer.step(closure)
+
+        self.is_fitted = True  # Mark model as trained
 
     def get_mean_std(self, candidates):
         """
-        Get mean and standard deviation predictions for candidates
-        
-        Args:
-            candidates: List of candidates to get predictions for
-            
-        Returns:
-            mu: Mean predictions
-            sigma: Standard deviation predictions
+        Get mean and standard deviation predictions for candidates.
         """
         if not self.X:
-            # If no observations, return default values
-            return np.zeros(len(candidates)), np.ones(len(candidates))
-        
-        # Convert candidates to appropriate format
-        X_candidates = self._process_candidates(candidates)
-        
-        # Fit GP model only if it hasn't been fitted since last update
+            return torch.zeros(len(candidates), device=self.device), torch.ones(len(candidates), device=self.device)
+
+        X_candidates = self._process_x(candidates)
+
         if not self.is_fitted:
-            # Ensure proper X format for fitting
-            X_train = np.stack(self.X)
-            if X_train.ndim != 1:
-                X_train = X_train.reshape(-1, X_candidates.shape[1])
-            if X_train.ndim == 1:
-                X_train = X_train.reshape(-1, 1)
-            
-            self.gp.fit(X_train, np.array(self.y))
-            self.is_fitted = True
-        
-        # Predict mean and standard deviation
-        mu, sigma = self.gp.predict(X_candidates, return_std=True)
-        
+            self._fit_gp()
+
+        # Switch to evaluation mode
+        self.gp_model.eval()
+        self.likelihood.eval()
+
+        with torch.no_grad():
+            preds = self.likelihood(self.gp_model(X_candidates))
+            mu = preds.mean
+            sigma = preds.stddev
+
         return mu, sigma
 
     def select(self, candidates, n=1):
         """
-        Select the best n candidates to sample next based on GP-UCB
-        
+        Select the best n candidates to sample next based on GP-UCB.
+
         Args:
-            candidates: List of candidates (indices or embeddings)
-            n: Number of candidates to select
-            
+            candidates (torch.Tensor or array-like): List of candidates (indices or embeddings).
+            n (int): Number of candidates to select.
+
         Returns:
-            List of selected candidates
+            torch.Tensor: Indices of selected candidates.
         """
         if not self.X:
-            # Cold start: if no observations yet, just return the first n candidates
-            return np.arange(min(n, len(candidates)))
-        
-        # Convert candidates to appropriate format
-        X_candidates = self._process_candidates(candidates)
-        
-        # Fit GP model only if it hasn't been fitted since last update
-        if not self.is_fitted:
-            # Ensure proper X format for fitting
-            X_train = np.stack(self.X)
-            if X_train.ndim != 1:
-                X_train = X_train.reshape(-1, X_candidates.shape[1])
-            if X_train.ndim == 1:
-                X_train = X_train.reshape(-1, 1)
-                
-            # Fit the model
-            self.gp.fit(X_train, np.array(self.y))
-            self.is_fitted = True
-        
-        # Predict mean and standard deviation for all candidates
-        mu, sigma = self.gp.predict(X_candidates, return_std=True)
-        
-        # Calculate upper confidence bound
-        ucb = mu + np.sqrt(self.beta) * sigma
-        
-        # Get indices of candidates with highest UCB values
-        top_indices = np.argsort(-ucb)[:n]
-        
-        # Return selected candidates
-        return top_indices[:n]
-    
+            return torch.arange(min(n, len(candidates)), device=self.device)
+
+        mu, sigma = self.get_mean_std(candidates)
+
+        # Compute Upper Confidence Bound (UCB)
+        ucb = mu + torch.sqrt(torch.tensor(self.beta, device=self.device)) * sigma
+
+        # Select top-n candidates with highest UCB values
+        top_indices = torch.argsort(-ucb)[:n]
+
+        return top_indices
+
     def get_top_k(self, candidates, k):
         """
-        Get the top k candidates with highest mean values
+        Get the top k candidates with highest mean values.
         """
-        mu, sigma = self.get_mean_std(candidates)
-        return np.argsort(-mu)[:k]
+        mu, _ = self.get_mean_std(candidates)
+        return torch.argsort(-mu)[:k]
+
+
+
+
+# class RetrievalGPUCB:
+#     """
+#     GP-UCB implementation specifically for retrieval tasks.
+#     """
+    
+#     def __init__(self, beta=2.0, kernel='rbf'):
+#         """
+#         Initialize the GP-UCB algorithm for retrieval
+        
+#         Args:
+#             beta: Exploration parameter that balances exploitation vs exploration
+#             is_embeddings_based: Whether to use embeddings (True) or indices (False) as features
+#         """
+#         self.beta = beta
+#         self.is_fitted = False
+#         # Observations
+#         self.X = []  # Features of observed points (indices or embeddings)
+#         self.y = []  # Rewards (relevance scores) observed so far
+        
+#         # Setup GP regressor with appropriate kernel: 
+#         # 1. RBF
+#         if kernel == "rbf":
+#             kernel = C(1.0) * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+#         # 2. Matern
+#         elif kernel == 'matern':
+#             kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+#         # 3. Rational Quadratic
+#         elif kernel == 'rational_quadratic':
+#             kernel = C(1.0) * RationalQuadratic(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+#         # 4. Exponential
+#         elif kernel == 'exp_sine_squared':
+#             kernel = C(1.0) * ExpSineSquared(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+#         # 5. Dot Product
+#         elif kernel == 'dot_product':
+#             kernel = C(1.0) * DotProduct()
+        
+            
+#         self.gp = GaussianProcessRegressor(
+#             kernel=kernel,
+#             alpha=1e-6,  # Small noise to avoid numerical issues
+#             normalize_y=True,
+#             n_restarts_optimizer=5
+#         )
+    
+#     def update(self, x, reward):
+#         """
+#         Update the GP model with a new observation
+        
+#         Args:
+#             x: The feature of the selected candidate (index or embedding)
+#             reward: The observed reward (relevance score)
+#         """
+#         x_processed = self._process_x(x)
+#         self.X.append(x_processed)  # Add the flattened array
+#         self.y.append(reward)
+#         # Mark that model needs refitting after new data
+#         self.is_fitted = False
+    
+#     def _process_x(self, candidates):
+#         """
+#         Process candidates into appropriate format for GP
+        
+#         Args:
+#             candidates: List of candidates (indices or embeddings), already a numpy array
+            
+#         Returns:
+#             Numpy array of processed candidates
+#         """
+#         # convert to numpy array if not already):
+#         if not isinstance(candidates, np.ndarray):
+#             candidates = np.array(candidates)
+        
+#         # Ensure proper dimensionality (2D: samples × features)
+#         if candidates.ndim == 1:
+#             # If 1D, add a dimension to make it 2D
+#             candidates = candidates.reshape(1, -1)
+            
+#         return candidates
+    
+#     def _process_candidates(self, candidates):
+#         if isinstance(candidates, list):
+#             candidates = np.array(candidates)
+
+#         if candidates.ndim == 1:
+#             candidates = candidates.reshape(-1, 1)
+#         return candidates
+            
+
+#     def get_mean_std(self, candidates):
+#         """
+#         Get mean and standard deviation predictions for candidates
+        
+#         Args:
+#             candidates: List of candidates to get predictions for
+            
+#         Returns:
+#             mu: Mean predictions
+#             sigma: Standard deviation predictions
+#         """
+#         if not self.X:
+#             # If no observations, return default values
+#             return np.zeros(len(candidates)), np.ones(len(candidates))
+        
+#         # Convert candidates to appropriate format
+#         X_candidates = self._process_candidates(candidates)
+        
+#         # Fit GP model only if it hasn't been fitted since last update
+#         if not self.is_fitted:
+#             # Ensure proper X format for fitting
+#             X_train = np.stack(self.X)
+#             if X_train.ndim != 1:
+#                 X_train = X_train.reshape(-1, X_candidates.shape[1])
+#             if X_train.ndim == 1:
+#                 X_train = X_train.reshape(-1, 1)
+            
+#             self.gp.fit(X_train, np.array(self.y))
+#             self.is_fitted = True
+        
+#         # Predict mean and standard deviation
+#         mu, sigma = self.gp.predict(X_candidates, return_std=True)
+        
+#         return mu, sigma
+
+#     def select(self, candidates, n=1):
+#         """
+#         Select the best n candidates to sample next based on GP-UCB
+        
+#         Args:
+#             candidates: List of candidates (indices or embeddings)
+#             n: Number of candidates to select
+            
+#         Returns:
+#             List of selected candidates
+#         """
+#         if not self.X:
+#             # Cold start: if no observations yet, just return the first n candidates
+#             return np.arange(min(n, len(candidates)))
+        
+#         # Convert candidates to appropriate format
+#         X_candidates = self._process_candidates(candidates)
+        
+#         # Fit GP model only if it hasn't been fitted since last update
+#         if not self.is_fitted:
+#             # Ensure proper X format for fitting
+#             X_train = np.stack(self.X)
+#             if X_train.ndim != 1:
+#                 X_train = X_train.reshape(-1, X_candidates.shape[1])
+#             if X_train.ndim == 1:
+#                 X_train = X_train.reshape(-1, 1)
+                
+#             # Fit the model
+#             self.gp.fit(X_train, np.array(self.y))
+#             self.is_fitted = True
+        
+#         # Predict mean and standard deviation for all candidates
+#         mu, sigma = self.gp.predict(X_candidates, return_std=True)
+        
+#         # Calculate upper confidence bound
+#         ucb = mu + np.sqrt(self.beta) * sigma
+        
+#         # Get indices of candidates with highest UCB values
+#         top_indices = np.argsort(-ucb)[:n]
+        
+#         # Return selected candidates
+#         return top_indices[:n]
+    
+#     def get_top_k(self, candidates, k):
+#         """
+#         Get the top k candidates with highest mean values
+#         """
+#         mu, sigma = self.get_mean_std(candidates)
+#         return np.argsort(-mu)[:k]
     
 if __name__ == "__main__":
     # test the retrieval_gpucb class, and plot the results
