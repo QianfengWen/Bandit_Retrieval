@@ -13,8 +13,9 @@ def evaluate(question_ids: list, passage_ids: list, retrieval_results: np.array,
     """
     scores = []
     for i, qid in enumerate(question_ids):
-        q_result = retrieval_results[i].tolist()
-        q_result = [passage_ids[j] for j in q_result]
+        # q_result = retrieval_results[i].tolist()
+        # q_result = [passage_ids.index(j) for j in q_result]
+        q_result = retrieval_results[i]
         truth = relevance_map[qid]
         scores.append(evaluation_func(q_result, truth, k))
     return np.mean(scores)

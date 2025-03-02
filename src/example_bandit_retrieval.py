@@ -1,7 +1,7 @@
 import numpy as np
 from src.Retrieval.bandit_retrieval import bandit_retrieval_indices_based, bandit_retrieval_embeddings_based
 from src.Retrieval.llm import LLM
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 import time
 from src.Dataset.msmarco import MSMARCO
 from src.Dataset.antique import Antique
@@ -16,8 +16,10 @@ from tqdm import tqdm
 
 def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts):
     if model_name and os.path.exists(query_embeddings_path) and os.path.exists(passage_embeddings_path):
+        print(f"Loading embeddings from {query_embeddings_path} and {passage_embeddings_path}")
         return load_embeddings(query_embeddings_path, passage_embeddings_path)
     else:
+        print(f"Creating embeddings for {model_name}")
         return create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path)
 
 def main():
@@ -39,11 +41,11 @@ def main():
     beta = 2.0
     llm_budget = 100
     k_cold_start = 50
-    k_retrieval = 10
+    k_retrieval = llm_budget
     
     # print("=== Bandit Retrieval Demo ===")
     
-    retrieval_results = []
+    bandit_retrieval_results, baseline_retrieval_results = [], []
     # # 1. Indices-based retrieval
     if method == "score":
         print("\n=== Indices-based Retrieval ===")
@@ -66,7 +68,7 @@ def main():
                 k_retrieval=k_retrieval
             )
             elapsed = time.time() - start_time
-            retrieval_results.append(bandit_res)
+            bandit_retrieval_results.append(bandit_res)
             p_k = precision_k(bandit_res, relevance_map[query_id], k_retrieval)
             print(f"Precision@{k_retrieval}: {p_k}")
 
@@ -96,18 +98,39 @@ def main():
                 k_retrieval=k_retrieval
             )
             elapsed = time.time() - start_time
-            retrieval_results.append(bandit_res)
-            p_k = precision_k(bandit_res, relevance_map[query_id], k_retrieval)
-            print(f"Precision@{k_retrieval}: {p_k}")
+            bandit_retrieval_results.append(bandit_res)
+            baseline_retrieval_results.append(baseline_res)
 
-            baseline_p_k = precision_k(baseline_res, relevance_map[query_id], k_retrieval)
-            print(f"Baseline Precision@{k_retrieval}: {baseline_p_k}")
+            k = k_cold_start
+            print("\n********* Bandit Retrieval Results: **********")
+            while k <= k_retrieval:
+                p_k = precision_k(bandit_res, relevance_map[query_id], k)
+                print(f"\nPrecision@{k}: {p_k}")
+
+                baseline_p_k = precision_k(baseline_res, relevance_map[query_id], k)
+                print(f"Baseline Precision@{k}: {baseline_p_k}")
+                k += 10
+
+    print("=== Bandit Retrieval Demo ===")
+    print(f"Model: {model_name}")
+    print(f"Dataset: {dataset_name}")
+    print(f"Method: {method}")
+    print(f"Beta: {beta}")
+    print(f"LLM Budget: {llm_budget}")
+    print(f"Cold Start K: {k_cold_start}")
+    print(f"Retrieval K: {k_retrieval}")
     
-    retrieval_results = np.array(retrieval_results)
+    bandit_retrieval_results = np.array(bandit_retrieval_results)
+    baseline_retrieval_results = np.array(baseline_retrieval_results)
 
-    eval_res = evaluate(question_ids, passage_ids, retrieval_results, relevance_map, precision_k, k_retrieval)
-    print(f"Precision@{k_retrieval}: {eval_res:.4f}")
+    k = k_cold_start
+    while k <= k_retrieval:
+        baseline_eval_res = evaluate(question_ids, passage_ids, baseline_retrieval_results, relevance_map, precision_k, k)
+        print(f"\nBaseline Retrieval Precision@{k}: {baseline_eval_res:.4f}")
+
+        bandit_eval_res = evaluate(question_ids, passage_ids, bandit_retrieval_results, relevance_map, precision_k, k)
+        print(f"Bandit Retrieval Precision@{k}: {bandit_eval_res:.4f}")
+        k += 10
         
-
 if __name__ == "__main__":
     main() 

@@ -35,5 +35,5 @@ class LLM:
                 return self.relevance_map[query_id][passage_id]
             elif query_id not in self.relevance_map:
                 raise ValueError(f"No relevance map found for query_id: {query_id}")
-        
+       
         return 0.0

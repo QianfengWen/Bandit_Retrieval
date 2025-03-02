@@ -30,7 +30,6 @@ def retrieve_k(query_embeddings: np.ndarray, distance_type: str, passage_embeddi
         
     return indices.detach().cpu().numpy()
 
-
 def calculate_cosine_similarity(query_embeddings, passage_embeddings):
     return np.dot(query_embeddings, passage_embeddings.T)
 
@@ -129,7 +128,6 @@ def bandit_retrieval_indices_based(passage_ids: list, passage_embeddings: list, 
     
     return top_k_ids, baseline_ids
 
-
 def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: list, passages: list, llm, query, query_embedding, query_id, beta=2.0, llm_budget: int=10, k_cold_start: int=5, k_retrieval: int=10) -> list:
     """
     Bandit retrieval using GP-UCB, based on embeddings of passages.
@@ -186,6 +184,11 @@ def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: lis
             # Store observation
             scores[target_id] = score
             observed_ids.append(target_id)
+
+            # print("\nfor query: ", query)
+            # print("for passage: ", passages[passage_idx])
+            # print("Cold start score: ", score)
+            # print("cosine similarity: ", cosine_similairty_matrix[passage_idx])
             
             # Update GP-UCB model using the passage embedding as feature
             gpucb.update(id_to_embedding[target_id], score)

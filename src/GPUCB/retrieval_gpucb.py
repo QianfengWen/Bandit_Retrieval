@@ -3,6 +3,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
 import matplotlib.pyplot as plt
 import pdb
+import time
 
 class RetrievalGPUCB:
     """
@@ -155,7 +156,9 @@ class RetrievalGPUCB:
                 X_train = X_train.reshape(-1, 1)
                 
             # Fit the model
+            start = time.time()
             self.gp.fit(X_train, np.array(self.y))
+            end = time.time()
             self.is_fitted = True
         
         # Predict mean and standard deviation for all candidates
