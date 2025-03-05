@@ -3,10 +3,6 @@ import torch
 import numpy as np
 import os
 from sentence_transformers import SentenceTransformer
-from scipy import sparse
-import time
-from sklearn.neighbors import kneighbors_graph
-import pdb
 
 def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path):
     embedder = SentenceTransformer(model_name)
