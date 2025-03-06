@@ -62,7 +62,8 @@ def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: lis
             batch_passages = [passages[idx] for idx in passage_idxs]
 
             # Get relevance scores for the batch using LLM
-            batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=batch)
+            batch_scores = llm.get_score(query, batch_passages)
+            print("batch_scores: ", batch_scores)
 
             # Store observations
             for target_id, score in zip(batch, batch_scores):
@@ -95,7 +96,7 @@ def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: lis
         batch_passages = [passages[idx] for idx in passage_idxs]
 
         # Get relevance scores using LLM in batch
-        batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=next_ids)
+        batch_scores = llm.get_score(query, batch_passages)
 
         # Store observations and update GP-UCB model
         for next_id, score in zip(next_ids, batch_scores):

@@ -37,10 +37,10 @@ def main():
     
     # Parameters
     beta = 2.0
-    llm_budget = 20
-    k_cold_start = 10
+    llm_budget = 40
+    k_cold_start = 20
     k_retrieval = llm_budget
-    batch_size = 3
+    batch_size = 5
     
     # print("=== Bandit Retrieval Demo ===")
     
@@ -115,11 +115,12 @@ def main():
     print(f"LLM Budget: {llm_budget}")
     print(f"Cold Start K: {k_cold_start}")
     print(f"Retrieval K: {k_retrieval}")
+    print(f"Batch Size: {batch_size}")
     
     bandit_retrieval_results = np.array(bandit_retrieval_results)
     baseline_retrieval_results = np.array(baseline_retrieval_results)
 
-    k = k_cold_start
+    k = 10
     while k <= k_retrieval:
         baseline_eval_res = evaluate(question_ids, passage_ids, baseline_retrieval_results, relevance_map, precision_k, k)
         print(f"\nBaseline Retrieval Precision@{k}: {baseline_eval_res:.4f}")
