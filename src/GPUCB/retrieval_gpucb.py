@@ -172,12 +172,17 @@ class RetrievalGPUCB:
         # Return selected candidates
         return top_indices[:n]
     
-    def get_top_k(self, candidates, k):
+    def get_top_k(self, candidates, k, return_scores=False):
         """
-        Get the top k candidates with highest mean values
+        Get the top k candidates with highest mean values and their corresponding scores
         """
         mu, sigma = self.get_mean_std(candidates)
-        return np.argsort(-mu)[:k]
+        sorted_indices = np.argsort(-mu)[:k]
+        top_k_scores = mu[sorted_indices]
+
+        if return_scores:
+            return sorted_indices, top_k_scores
+        return sorted_indices
     
 if __name__ == "__main__":
     pass
