@@ -69,12 +69,19 @@ class TravelDest():
             for doc_name in relevant_doc_names:
                 doc_id = self.cities.index(doc_name)
                 relevance_map[query_id][doc_id] = 1.0
-        return relevance_map
+        return relevance_map        
             
+    def create_passage_ids_to_city_map(self, passage_dict, passage_ids, passage_texts):
+        for passage_id, passage_text in zip(passage_ids, passage_texts):
+            for city, passages in passage_dict.items():
+                if passage_text in passages:
+                    passage_dict[passage_id] = city
+
     def load_data(self):
         self.queries, self.passages, self.qrels_iter, self.passage_dict, self.cities = self.load_dataset()
         question_ids, question_texts = self.load_questions()
         passage_ids, passage_texts = self.load_passages()
         relevance_map = self.create_relevance_map(question_texts)
+        passage_city_map = self.create_passage_ids_to_city_dict(self.passage_dict, passage_ids, passage_texts)
         
-        return question_ids, question_texts, passage_ids, passage_texts, relevance_map
+        return question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map
