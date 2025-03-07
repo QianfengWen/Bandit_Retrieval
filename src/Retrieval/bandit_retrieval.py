@@ -8,7 +8,7 @@ def calculate_cosine_similarity(query_embeddings, passage_embeddings):
     return np.dot(query_embeddings, passage_embeddings.T)
 
 
-def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: list, passages: list, llm: LLM, query, query_embedding, query_id, beta=2.0, llm_budget: int=10, k_cold_start: int=5, k_retrieval: int=10, batch_size: int=10) -> list:
+def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: list, passages: list, llm: LLM, query, query_embedding, query_id, beta=2.0, llm_budget: int=10, k_cold_start: int=5, k_retrieval: int=10, batch_size: int=10, relevance_map: dict=None) -> list:
     """
     Bandit retrieval using GP-UCB, based on embeddings of passages.
     
@@ -64,6 +64,14 @@ def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: lis
             # Get relevance scores for the batch using LLM
             batch_scores = llm.get_score(query, batch_passages)
             print("batch_scores: ", batch_scores)
+
+            # create score and passage pairs, print them
+            for score, passage in zip(batch_scores, batch_passages):
+                try:
+                    print(f"True: {relevance_map[query_id].get(target_id, 0)}, Score: {score}, Passage: {passage}")
+                except UnicodeEncodeError:
+                    # Fallback to ASCII encoding if Unicode fails
+                    print(f"True: {relevance_map[query_id].get(target_id, 0)}, Score: {score}, Passage: {passage.encode('ascii', 'replace').decode()}")
 
             # Store observations
             for target_id, score in zip(batch, batch_scores):

@@ -23,13 +23,15 @@ def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path
 def main():
     # Sample data
     model_name = "all-MiniLM-L6-v2"
-    dataset_name = "scidocs"
+    # dataset_name = "scidocs"
+    dataset_name = "NFCorpus"
     method = "embeddings"
     # method = "score"
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-    scidocs = Scidocs()
-    question_ids, queries, passage_ids, passages, relevance_map = scidocs.load_data()
+    # scidocs = Scidocs()
+    dataset = NFCorpus()
+    question_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
     
     # Create LLM interface with ground truth relevance
@@ -40,7 +42,7 @@ def main():
     llm_budget = 40
     k_cold_start = 20
     k_retrieval = llm_budget
-    batch_size = 5
+    batch_size = 1
     
     # print("=== Bandit Retrieval Demo ===")
     
@@ -78,7 +80,12 @@ def main():
     # First, get embeddings for queries and passages
     print("\n=== Embeddings-based Retrieval ===")
     for i, (query, query_id) in tqdm(enumerate(zip(queries, question_ids)), desc="Query", total=len(queries)):
-        print(f"\nQuery: {query}")
+        try:
+            print(f"\nQuery: {query}")
+        except UnicodeEncodeError:
+            # Fallback to ASCII encoding if Unicode fails
+            print(f"\nQuery: {query.encode('ascii', 'replace').decode()}")
+
         
         bandit_res, baseline_res = bandit_retrieval_embeddings_based(
             passage_ids=passage_ids.copy(),
@@ -92,7 +99,8 @@ def main():
             llm_budget=llm_budget,
             k_cold_start=k_cold_start,
             k_retrieval=k_retrieval,
-            batch_size=batch_size
+            batch_size=batch_size,
+            relevance_map=relevance_map
         )
         bandit_retrieval_results.append(bandit_res)
         baseline_retrieval_results.append(baseline_res)
