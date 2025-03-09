@@ -123,7 +123,7 @@ def bandit_retrieval_embeddings_based(passage_ids: list, passage_embeddings: lis
 
 
 
-def rec_retrieval(passage_ids: list, passage_embeddings: list, passages: list, llm: LLM, query, query_embedding, query_id, beta=2.0, llm_budget: int=10, k_cold_start: int=5, k_retrieval: int=10, batch_size: int=10) -> list:
+def rec_retrieval(passage_ids: list, passage_embeddings: list, passages: list, llm: LLM, query, query_embedding, query_id, beta=2.0, llm_budget: int=10, k_cold_start: int=5, k_retrieval: int=10, batch_size: int=10, relevance_map: dict=None) -> list:
     """
     Bandit retrieval using GP-UCB, based on embeddings of passages.
     
@@ -180,6 +180,15 @@ def rec_retrieval(passage_ids: list, passage_embeddings: list, passages: list, l
             batch_scores = llm.get_score(query, batch_passages)
             print("batch_scores: ", batch_scores)
 
+            # create score and passage pairs, print them
+            for score, passage in zip(batch_scores, batch_passages):
+                try:
+                    print(f"True: {relevance_map[query_id].get(target_id, 0)}, Score: {score}, Passage: {passage}")
+                except UnicodeEncodeError:
+                    # Fallback to ASCII encoding if Unicode fails
+                    print(f"True: {relevance_map[query_id].get(target_id, 0)}, Score: {score}, Passage: {passage.encode('ascii', 'replace').decode()}")
+
+
             # Store observations
             for target_id, score in zip(batch, batch_scores):
                 scores[target_id] = score
@@ -223,7 +232,11 @@ def rec_retrieval(passage_ids: list, passage_embeddings: list, passages: list, l
     top_k_idx, top_k_scores = gpucb.get_top_k(passage_embeddings, k_retrieval, return_scores=True)
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
-    return top_k_ids, top_k_scores
+    baseline_idx = np.argsort(cosine_similairty_matrix)[::-1][:k_retrieval]
+    baseline_ids = [passage_ids[idx] for idx in baseline_idx]
+    baseline_scores = [cosine_similairty_matrix[idx] for idx in baseline_idx]
+
+    return top_k_ids, top_k_scores, baseline_ids, baseline_scores
 
 
 

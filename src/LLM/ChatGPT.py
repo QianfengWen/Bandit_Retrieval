@@ -6,7 +6,7 @@ import os
 import json
 
 class Scores(BaseModel):
-    scores: dict[str, float]
+    scores: dict[str, int]
 
 response_format = {
     "type": "json_schema",
@@ -20,8 +20,8 @@ class ChatGPT(LLM):
     """
     GPT Chat Completion using OpenAI API
     """
-    def __init__(self, model_name: str = "gpt-4o-mini-2024-07-18", api_key: str = "API_KEY"):
-    # def __init__(self, model_name: str = "gpt-4o-2024-11-20", api_key: str = "API_KEY"):
+    # def __init__(self, model_name: str = "gpt-4o-mini-2024-07-18", api_key: str = "API_KEY"):
+    def __init__(self, model_name: str = "gpt-4o-2024-11-20", api_key: str = "API_KEY"):
         self.model_name = model_name
         self.client = OpenAI(api_key=api_key)
 
@@ -68,8 +68,7 @@ class ChatGPT(LLM):
         Measure how well the content matches a likely intent of the query (M).
         Measure how trustworthy the passage is (T).
         Consider the aspects above and the relative importance of each, and decide on a final score (O). Final score must be an integer value only.
-        Do not provide any code in result. Provide each score in the format of: ##final score: score without providing any reasoning.
-        Return the results in JSON format.
+        Do not provide any code in result. Return a JSON object mapping passage index to its relevance score, the index starts from 0.
         """
 
         prompt = [
@@ -81,13 +80,12 @@ class ChatGPT(LLM):
 
         try:
             scores = json.loads(response)["scores"]
-            if len(scores) == 1:
-                return [scores.get("final score", 0.1)]
-            else:
-                return [scores.get(f"passage{i+1}", 0.1) for i in range(len(passages))] 
+            print("scores: ", scores)
+            print(len(passages))
+            return [scores.get(str(i), -1) for i in range(len(passages))] 
         except Exception as e:
             print("Failed to parse LLM response:", e)
-            return [0.1] * len(passages) 
+            return [-1] * len(passages) 
         
 
 if __name__ == "__main__":

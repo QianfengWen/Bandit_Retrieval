@@ -5,12 +5,13 @@ from src.LLM.ChatGPT import ChatGPT
 from src.Dataset.antique import Antique
 from src.Dataset.nfcorpus import NFCorpus
 from src.Dataset.scidocs import Scidocs
+from src.Dataset.travel_dest import TravelDest
 from src.Embedding.embedding import create_embeddings, load_embeddings
 from src.Evaluation.evaluation import precision_k, evaluate
 import numpy as np
 import os
 from tqdm import tqdm
-
+import pdb
 
 def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts):
     if model_name and os.path.exists(query_embeddings_path) and os.path.exists(passage_embeddings_path):
@@ -23,15 +24,15 @@ def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path
 def main():
     # Sample data
     model_name = "all-MiniLM-L6-v2"
-    # dataset_name = "scidocs"
-    dataset_name = "NFCorpus"
+    dataset_name = "scidocs"
+    # dataset_name = "travel_dest"
     method = "embeddings"
     # method = "score"
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-    # scidocs = Scidocs()
-    dataset = NFCorpus()
+    dataset = Scidocs()
     question_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
+    pdb.set_trace()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
     
     # Create LLM interface with ground truth relevance

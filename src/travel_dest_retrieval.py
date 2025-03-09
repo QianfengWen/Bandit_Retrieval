@@ -34,6 +34,13 @@ def eval_rec(passage_ids, scores, passage_city_map, ground_truth, k):
     
     city_scores = {k: np.mean(v) for k, v in city_scores.items()}
     top_k_cities = sorted(city_scores, key=city_scores.get, reverse=True)[:k]
+    try:
+        print(f"Top {k} cities: {top_k_cities}")
+    except UnicodeEncodeError:
+        # Encode each city name individually and create a new encoded list
+        encoded_cities = [city.encode('ascii', 'replace').decode() for city in top_k_cities]
+        print(f"Top {k} cities: {encoded_cities}")
+    print(f"Ground truth: {ground_truth}")
     prec_k = precision_k(top_k_cities, ground_truth, k)
     rec_k = recall_k(top_k_cities, ground_truth, k)
     map_k = mean_average_precision_k(top_k_cities, ground_truth, k)
@@ -59,21 +66,25 @@ def main():
     
     # Parameters
     beta = 2.0
-    llm_budget = 40
+    llm_budget = 50
     k_cold_start = 20
     k_retrieval = 1000
     batch_size = 5
     
     # print("=== Bandit Retrieval Demo ===")
-    
-    bandit_retrieval_results = []
+    baseline_prec_k = dict()
+    baseline_rec_k = dict()
+    baseline_map_k = dict()
+    bandit_prec_k = dict()
+    bandit_rec_k = dict()
+    bandit_map_k = dict()
 
     # First, get embeddings for queries and passages
     print("\n=== Embeddings-based Retrieval ===")
     for i, (query, query_id) in tqdm(enumerate(zip(queries, question_ids)), desc="Query", total=len(queries)):
         print(f"\nQuery: {query}")
         
-        bandit_res, bandit_score = rec_retrieval(
+        bandit_res, bandit_score, baseline_res, baseline_score = rec_retrieval(
             passage_ids=passage_ids.copy(),
             passage_embeddings=passage_embeddings,
             passages=passages,
@@ -85,32 +96,52 @@ def main():
             llm_budget=llm_budget,
             k_cold_start=k_cold_start,
             k_retrieval=k_retrieval,
-            batch_size=batch_size
+            batch_size=batch_size,
+            relevance_map=relevance_map
         )
 
         print("\n********* Bandit Retrieval Results: **********")
         k_eval = 50
         k_start = 10
         while k_start <= k_eval:
-            prec_k, rec_k, map_k = eval_rec(bandit_res, bandit_score, passage_to_city, relevance_map[query_id], k_start)
+            prec_k, rec_k, map_k = eval_rec(bandit_res, bandit_score, passage_to_city, list(relevance_map[query_id].keys()), k_start)
+            prec_k_baseline, rec_k_baseline, map_k_baseline = eval_rec(baseline_res, baseline_score, passage_to_city, list(relevance_map[query_id].keys()), k_start)
             print(f"\nPrecision@{k_start}: {prec_k}")
+            print(f"Precision@{k_start} Baseline: {prec_k_baseline}\n")
             print(f"Recall@{k_start}: {rec_k}")
+            print(f"Recall@{k_start} Baseline: {rec_k_baseline}\n")
             print(f"MAP@{k_start}: {map_k}")
+            print(f"MAP@{k_start} Baseline: {map_k_baseline}\n")
+            baseline_prec_k[k_start] = prec_k_baseline
+            baseline_rec_k[k_start] = rec_k_baseline
+            baseline_map_k[k_start] = map_k_baseline
+            bandit_prec_k[k_start] = prec_k
+            bandit_rec_k[k_start] = rec_k
+            bandit_map_k[k_start] = map_k
+            k_start += 10
 
 
 
-    # print("=== Bandit Retrieval Demo ===")
-    # print(f"Model: {model_name}")
-    # print(f"Dataset: {dataset_name}")
-    # print(f"Method: {method}")
-    # print(f"Beta: {beta}")
-    # print(f"LLM Budget: {llm_budget}")
-    # print(f"Cold Start K: {k_cold_start}")
-    # print(f"Retrieval K: {k_retrieval}")
-    # print(f"Batch Size: {batch_size}")
+    print("=== Bandit Retrieval Demo ===")
+    print(f"Model: {model_name}")
+    print(f"Dataset: {dataset_name}")
+    print(f"Method: {method}")
+    print(f"Beta: {beta}")
+    print(f"LLM Budget: {llm_budget}")
+    print(f"Cold Start K: {k_cold_start}")
+    print(f"Retrieval K: {k_retrieval}")
+    print(f"Batch Size: {batch_size}")
     
     # bandit_retrieval_results = np.array(bandit_retrieval_results)
     # baseline_retrieval_results = np.array(baseline_retrieval_results)
+
+    for k in baseline_prec_k.keys():
+        print(f"Precision@{k}: {np.mean(baseline_prec_k[k])}")
+        print(f"Precision@{k} Bandit: {np.mean(bandit_prec_k[k])}")
+        print(f"Recall@{k}: {np.mean(baseline_rec_k[k])}")
+        print(f"Recall@{k} Bandit: {np.mean(bandit_rec_k[k])}")
+        print(f"MAP@{k}: {np.mean(baseline_map_k[k])}")
+        print(f"MAP@{k} Bandit: {np.mean(bandit_map_k[k])}")
 
     # k = 10
     # while k <= k_retrieval:
