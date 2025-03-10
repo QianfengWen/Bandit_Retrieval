@@ -36,9 +36,6 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
             - If return_scores=False: List of cities sorted by average top-k score.
             - If return_scores=True: Dict of {city: average score}, sorted by score.
     """
-    if not passage_ids or not scores or not passage_city_map:
-        return [] if not return_scores else {}
-
     city_scores = defaultdict(list)
 
     # aggregate scores by city
@@ -118,19 +115,20 @@ def main():
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
     beta = 2.0
     llm_budget = 50
-    k_cold_start = 20
+    k_cold_start = 50
     batch_size = 5
-    verbose = False
+    verbose = True
     k_eval = 50
     k_start = 10
-    top_k_passages = 50
+    top_k_passages = 10
+    k_retrieval = 1000
     
-    baseline_prec_k = dict()
-    baseline_rec_k = dict()
-    baseline_map_k = dict()
-    bandit_prec_k = dict()
-    bandit_rec_k = dict()
-    bandit_map_k = dict()
+    baseline_prec_k = defaultdict(list)
+    baseline_rec_k = defaultdict(list)
+    baseline_map_k = defaultdict(list)
+    bandit_prec_k = defaultdict(list)
+    bandit_rec_k = defaultdict(list)
+    bandit_map_k = defaultdict(list)
 
     ############## Bandit Retrieval ##############
     for i, (query, query_id) in tqdm(enumerate(zip(queries, question_ids)), desc="Query", total=len(queries)):
@@ -148,7 +146,7 @@ def main():
             beta=beta,
             llm_budget=llm_budget,
             k_cold_start=k_cold_start,
-            k_retrieval=len(passages),
+            k_retrieval=k_retrieval,
             batch_size=batch_size,
             verbose=verbose,
             return_score=True
@@ -157,6 +155,7 @@ def main():
         if verbose:
             print("\n********* Results: **********")
 
+        k_start = 10
         while k_start <= k_eval:
             bandit_cities = fusion_score(bandit_res, bandit_score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
             prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[query_id].keys()), k_start, verbose=verbose)
@@ -164,12 +163,12 @@ def main():
             baseline_cities = fusion_score(baseline_res, baseline_score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
             prec_k_baseline, rec_k_baseline, map_k_baseline = eval_rec(baseline_cities, list(relevance_map[query_id].keys()), k_start, verbose=verbose)
             
-            baseline_prec_k[k_start] = prec_k_baseline
-            baseline_rec_k[k_start] = rec_k_baseline
-            baseline_map_k[k_start] = map_k_baseline
-            bandit_prec_k[k_start] = prec_k
-            bandit_rec_k[k_start] = rec_k
-            bandit_map_k[k_start] = map_k
+            baseline_prec_k[k_start].append(prec_k_baseline)
+            baseline_rec_k[k_start] .append(rec_k_baseline)
+            baseline_map_k[k_start].append(map_k_baseline)
+            bandit_prec_k[k_start].append(prec_k)
+            bandit_rec_k[k_start].append(rec_k)
+            bandit_map_k[k_start].append(map_k)
             if verbose:
                 print(f"Precision@{k_start}: {prec_k_baseline}")
                 print(f"Precision@{k_start} Bandit: {prec_k}\n")
@@ -189,6 +188,7 @@ def main():
     print(f"Beta: {beta}")
     print(f"LLM Budget: {llm_budget}")
     print(f"Cold Start K: {k_cold_start}")
+    print(f"Retrieval K: {k_retrieval}")
     print(f"Batch Size: {batch_size}")
     print(f"Top K Passages: {top_k_passages}")
     
@@ -199,7 +199,7 @@ def main():
         print(f"Recall@{k}: {np.mean(baseline_rec_k[k])}")
         print(f"Recall@{k} Bandit: {np.mean(bandit_rec_k[k])}\n")
         print(f"MAP@{k}: {np.mean(baseline_map_k[k])}")
-        print(f"MAP@{k} Bandit: {np.mean(bandit_map_k[k])}")
+        print(f"MAP@{k} Bandit: {np.mean(bandit_map_k[k])}\n")
         
 if __name__ == "__main__":
     main() 

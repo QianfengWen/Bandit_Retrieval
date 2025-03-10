@@ -107,11 +107,11 @@ def bandit_retrieval(passage_ids: list, passage_embeddings: list, passages: list
         if verbose: # debug print
             print("batch_scores: ", batch_scores)
 
-        for score, passage in zip(batch_scores, batch_passages):
-            try:
-                print(f"Score: {score}, Passage: {passage}")
-            except UnicodeEncodeError:
-                print(f"Score: {score}, Passage: {passage.encode('ascii', 'replace').decode()}")
+            for score, passage in zip(batch_scores, batch_passages):
+                try:
+                    print(f"Score: {score}, Passage: {passage}")
+                except UnicodeEncodeError:
+                    print(f"Score: {score}, Passage: {passage.encode('ascii', 'replace').decode()}")
 
     # return the top-k passages based on final GP predictions
     top_k_idx, top_k_scores = gpucb.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
