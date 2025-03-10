@@ -48,7 +48,7 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
     city_average_scores = {}
     for city, city_score_list in city_scores.items():
         top_k_scores = sorted(city_score_list, reverse=True)[:top_k_passages]
-        city_average_scores[city] = np.mean(top_k_scores) if top_k_scores else 0.0
+        city_average_scores[city] = sum(top_k_scores) if top_k_scores else 0.0
 
     # sort cities by average score in descending order
     sorted_cities = sorted(city_average_scores.items(), key=lambda x: x[1], reverse=True)
@@ -116,12 +116,12 @@ def main():
     beta = 2.0
     llm_budget = 50
     k_cold_start = 50
-    batch_size = 5
+    batch_size = 10
     verbose = True
     k_eval = 50
     k_start = 10
-    top_k_passages = 10
-    k_retrieval = 1000
+    top_k_passages = 3
+    k_retrieval = len(passages)
     
     baseline_prec_k = defaultdict(list)
     baseline_rec_k = defaultdict(list)
