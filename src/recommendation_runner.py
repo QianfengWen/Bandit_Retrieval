@@ -3,13 +3,12 @@ from src.LLM.ChatGPT import ChatGPT
 from src.Dataset.travel_dest import TravelDest
 from src.Embedding.embedding import create_embeddings, load_embeddings
 from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k
-
+import json
 import numpy as np
 import os
 from tqdm import tqdm
 from collections import defaultdict
-
-
+from copy import deepcopy
 
 def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts):
     if model_name and os.path.exists(query_embeddings_path) and os.path.exists(passage_embeddings_path):
@@ -45,10 +44,14 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
             city_scores[city].append(score)
 
     # compute average top-k score for each city
+    city_count = 0
     city_average_scores = {}
     for city, city_score_list in city_scores.items():
         top_k_scores = sorted(city_score_list, reverse=True)[:top_k_passages]
         city_average_scores[city] = sum(top_k_scores) if top_k_scores else 0.0
+        if city_count < 50:
+            print(f"City: {city}, Topk_Score: {top_k_scores}, Score: {city_average_scores[city]}")
+        city_count += 1
 
     # sort cities by average score in descending order
     sorted_cities = sorted(city_average_scores.items(), key=lambda x: x[1], reverse=True)
@@ -116,7 +119,7 @@ def main():
     beta = 2.0
     llm_budget = 50
     k_cold_start = 50
-    batch_size = 10
+    batch_size = 5
     verbose = True
     k_eval = 50
     k_start = 10
@@ -135,7 +138,7 @@ def main():
         if verbose:
             print(f"Query: {query}")
         
-        bandit_res, bandit_score, baseline_res, baseline_score = bandit_retrieval(
+        bandit_res, bandit_score, baseline_res, baseline_score, top_k_passages_bandit, baseline_passages = bandit_retrieval(
             passage_ids=passage_ids.copy(),
             passage_embeddings=passage_embeddings,
             passages=passages,
@@ -152,14 +155,34 @@ def main():
             return_score=True
         )
 
+        if not os.path.exists("results/bandit_res/"):
+            os.makedirs("results/bandit_res/")
+        if not os.path.exists("results/bandit_score/"):
+            os.makedirs("results/bandit_score/")
+        if not os.path.exists("results/baseline_res/"):
+            os.makedirs("results/baseline_res/")
+
+        bandit_score_list = deepcopy(bandit_score).tolist()
+
+        with open(f"results/bandit_res/query_{query_id}_{query}.json", "w", encoding="utf-8") as f:
+            json.dump(top_k_passages_bandit, f, indent=4)
+
+        with open(f"results/bandit_score/query_{query_id}_{query}.json", "w", encoding="utf-8") as f:
+            json.dump(bandit_score_list, f, indent=4)
+
+        with open(f"results/baseline_res/query_{query_id}_{query}.json", "w", encoding="utf-8") as f:
+            json.dump(baseline_passages, f, indent=4)
+
         if verbose:
             print("\n********* Results: **********")
 
         k_start = 10
         while k_start <= k_eval:
+            print("fusing scores for bandit ....")
             bandit_cities = fusion_score(bandit_res, bandit_score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
             prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[query_id].keys()), k_start, verbose=verbose)
 
+            print("fusing scores for baseline ....")
             baseline_cities = fusion_score(baseline_res, baseline_score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
             prec_k_baseline, rec_k_baseline, map_k_baseline = eval_rec(baseline_cities, list(relevance_map[query_id].keys()), k_start, verbose=verbose)
             

@@ -116,13 +116,15 @@ def bandit_retrieval(passage_ids: list, passage_embeddings: list, passages: list
     # return the top-k passages based on final GP predictions
     top_k_idx, top_k_scores = gpucb.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
+    top_k_passages_bandit = [passages[idx] for idx in top_k_idx]
 
     baseline_idx = np.argsort(cosine_similairty_matrix)[::-1][:k_retrieval]
     baseline_ids = [passage_ids[idx] for idx in baseline_idx]
+    baseline_passages = [passages[idx] for idx in baseline_idx]
     
     if return_score:
         baseline_scores = [cosine_similairty_matrix[idx] for idx in baseline_idx]
-        return top_k_ids, top_k_scores, baseline_ids, baseline_scores
+        return top_k_ids, top_k_scores, baseline_ids, baseline_scores, top_k_passages_bandit, baseline_passages
 
     else:
         return top_k_ids, baseline_ids
