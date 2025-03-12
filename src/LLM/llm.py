@@ -57,7 +57,7 @@ class LLM(abc.ABC):
         """
         pass
 
-    def get_score(self, query, passages):
+    def get_score(self, query, passages, query_id=None, passage_ids=None, cache=None, update_cache=False):
         """
         Get the relevance score of a passage for a query
         

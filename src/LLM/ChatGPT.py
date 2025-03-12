@@ -2,8 +2,7 @@ from openai import OpenAI
 from src.LLM.llm import LLM
 from typing import Optional, Union
 from pydantic import BaseModel
-import os
-import json
+import os, json, csv
 
 class Scores(BaseModel):
     scores: dict[str, int]
@@ -39,7 +38,15 @@ class ChatGPT(LLM):
             return None
         return response.choices[0].message.content
     
-    def get_score(self, query: str, passages: list[str]) -> list[float]:
+    def get_score(
+            self, 
+            query: str, 
+            passages: list[str], 
+            query_id: int = None, 
+            passage_ids: list[int] = None, 
+            cache: str = None, 
+            update_cache: bool = False
+        ) -> list[float]:
         """
         Get the relevance score of each passage for a given query using a single LLM call.
 
@@ -50,6 +57,23 @@ class ChatGPT(LLM):
         Returns:
             A list of relevance scores between 0 and 1.
         """
+        if cache:
+            try:
+                assert query_id is not None and passage_ids is not None
+                all_ratings = cache[query_id]
+                target_ratings = [all_ratings[p_id] for p_id in passage_ids]
+                return target_ratings
+            
+            except KeyError:
+                print(f"Cache miss for query {query_id}, using LLM ...")
+
+            except AssertionError:
+                print("Cache is enabled but query_id and passage_ids are not provided, using LLM ...")
+            
+            except Exception as e:
+                print(f"Caching error: {e}, using LLM ...")
+
+
         formatted_passages = "\n".join([f"{i+1}. {p}" for i, p in enumerate(passages)])
         prompt_template = """
         Given a query and a list of passages, you must provide a score on an integer scale of 0 to 3 with the following meanings:
@@ -80,20 +104,82 @@ class ChatGPT(LLM):
 
         try:
             scores = json.loads(response)["scores"]
-            print("scores: ", scores)
-            print(len(passages))
-            return [scores.get(str(i), -1) for i in range(len(passages))] 
+            scores = [scores.get(str(i), -1) for i in range(len(passages))] 
+            
+            if cache and update_cache and query_id is not None and passage_ids is not None:
+                new_entries = []
+                
+                for p_id, score in zip(passage_ids, scores):
+                    if p_id not in cache[query_id]:
+                        new_entries.append([query_id, p_id, score])
+
+                if new_entries:
+                    print(f"Updating cache with {len(new_entries)} new entries ...")
+                    file_exists = os.path.exists(update_cache)
+                    
+                    with open(update_cache, mode='a', newline='', encoding='utf-8') as csvfile:
+                        writer = csv.writer(csvfile)
+                        
+                        if not file_exists:
+                            writer.writerow(["query_id", "passage_id", "score"])
+                        
+                        writer.writerows(new_entries)
+            
+            return scores
+        
         except Exception as e:
             print("Failed to parse LLM response:", e)
             return [-1] * len(passages) 
         
 
 if __name__ == "__main__":
-    # Load the API key from the environment variable
-    llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
-    query = "What is the capital of France?"
-    passages = ["Paris is the capital of France.", "France is a country in Europe.", "Paris is known for its Eiffel Tower."]
-    # for passage in passages:
-    #     print(passage)
-    #     print(llm.get_score(query, [passage]))
-    print(llm.get_score(query, passages))
+    from src.Dataset.travel_dest import TravelDest
+    import os
+    import json
+    from tqdm import tqdm
+
+    # Config
+    batch_size = 5
+    rating_results = dict()
+    lm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # Load dataset
+    dataset = TravelDest()
+    question_ids, queries, passage_ids, passages, relevance_map, passage_to_city = dataset.load_data()
+
+    for q_id, query in tqdm(zip(question_ids, queries), desc="Query", total=len(queries)):
+        rating_results[q_id] = dict()
+        ground_truth = relevance_map[q_id]
+
+        # Create list of (p_id, passage) pairs to retain p_id info
+        passage_to_eval = [
+            (p_id, passage) for p_id, passage in zip(passage_ids, passages) 
+            if passage_to_city[p_id] in ground_truth
+        ]
+        
+        # Batch processing
+        passage_batches = [
+            passage_to_eval[i:i + batch_size] 
+            for i in range(0, len(passage_to_eval), batch_size)
+        ]
+
+        for batch in tqdm(passage_batches, desc="Batch", total=len(passage_batches)):
+            # Get the passage texts only for LLM input
+            passage_texts = [passage for _, passage in batch]
+            try:
+                scores = lm.get_score(query, passage_texts)
+            except Exception as e:
+                print(f"Failed to process query {q_id} and passages {passage_batches}: {e}")
+                continue
+            # Store the scores using original p_id
+            for (p_id, _), score in zip(batch, scores):
+                rating_results[q_id][p_id] = score
+        
+        # Optional logging for debugging
+        print(f"Processed query {q_id}: {rating_results[q_id]}")
+        
+    # Save results to JSON
+    with open("data/travel_dest/rating_results.json", "w", encoding="utf-8") as f:
+        json.dump(rating_results, f, indent=4)
+
+            

@@ -30,7 +30,18 @@ class TravelDest():
 
         with open(f"data/travel_dest/ground_truth.json", "r", encoding='utf-8') as f:
             qrels_iter = json.load(f)
-            return queries, passages, qrels_iter, passage_dict, cities
+
+        with open(f"data/travel_dest/rating_results.csv", "r", encoding='utf-8') as f:
+            prelabel_relevance = defaultdict(dict)
+            f.readline()
+            for line in f:
+                query_id, doc_id, score = line.split(',')
+                query_id = int(query_id.strip(" \n"))
+                doc_id = int(doc_id.strip(" \n"))
+                score = int(score.strip(" \n"))
+                prelabel_relevance[query_id][doc_id] = score
+        
+        return queries, passages, qrels_iter, passage_dict, cities, prelabel_relevance
                    
     def load_questions(self):
         question_map = dict()
@@ -82,10 +93,10 @@ class TravelDest():
         return passage_id_to_city
 
     def load_data(self):
-        self.queries, self.passages, self.qrels_iter, self.passage_dict, self.cities = self.load_dataset()
+        self.queries, self.passages, self.qrels_iter, self.passage_dict, self.cities, prelabel_relevance = self.load_dataset()
         question_ids, question_texts = self.load_questions()
         passage_ids, passage_texts = self.load_passages()
         relevance_map = self.create_relevance_map(question_texts)
         passage_city_map = self.create_passage_ids_to_city_map(self.passage_dict, passage_ids, passage_texts)
         
-        return question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map
+        return question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map, prelabel_relevance
