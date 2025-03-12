@@ -1,6 +1,6 @@
 from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k
 from collections import defaultdict
-
+import pandas as pd
 
 def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, return_scores=False):
     """
@@ -80,3 +80,46 @@ def eval_rec(cities, ground_truth, k, verbose=False):
     map_k = mean_average_precision_k(top_k_cities, ground_truth, k)
 
     return prec_k, rec_k, map_k
+
+
+def save_results(configs, results, file_path):
+    """
+    Save experimental configurations and results to a CSV file.
+
+    Args:
+        configs (dict): Dictionary containing the configuration parameters for the experiment.
+            Each key-value pair represents a configuration setting.
+        results (dict[metric@k: float]): Dictionary containing the evaluation results.
+            Each key-value pair represents a metric and its value.
+        file_path (str): Path to the CSV file where results will be saved.
+            If file exists, results will be appended.
+
+    Returns:
+        bool: True if save was successful, False otherwise.
+
+    """
+    try:
+        # Create a single row DataFrame from configs
+        df_new = pd.DataFrame([configs])
+        
+        # Add results to the same row
+        for metric, value in results.items():
+            df_new[metric] = value
+            
+        # If file exists, append; otherwise create new file
+        try:
+            df_existing = pd.read_csv(file_path)
+            # check if the columns are the same
+            if set(df_existing.columns) != set(df_new.columns):
+                raise ValueError("Columns do not match")
+            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+        except FileNotFoundError:
+            df_combined = df_new
+            
+        # Save to CSV
+        df_combined.to_csv(file_path, index=False)
+        return True
+        
+    except Exception as e:
+        print(f"Error saving results: {str(e)}")
+        return False

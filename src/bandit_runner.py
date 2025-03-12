@@ -2,7 +2,7 @@ from src.Retrieval.retrieval import bandit_retrieval
 from src.LLM.ChatGPT import ChatGPT
 from src.Dataset.travel_dest import TravelDest
 from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import fusion_score, eval_rec
+from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
 
 from collections import defaultdict
 import numpy as np
@@ -37,7 +37,21 @@ def main():
     k_eval = 50
     k_start = 10
     top_k_passages = 3
-    
+    save_flag = True
+
+    gpucb_percentage = (llm_budget - k_cold_start) / llm_budget
+
+    configs = {
+        "llm_budget": llm_budget,
+        "gpucb_percentage": gpucb_percentage,
+        "k_retrieval": k_retrieval,
+        "top_k_passages": top_k_passages,
+        "batch_size": batch_size,
+        "beta": beta
+    }
+
+    result_path = f"{dataset_name}_{model_name}_bandit_results.csv"
+
 
     ############## Evaluation ##############
     prec_k_dict = defaultdict(list)
@@ -98,11 +112,19 @@ def main():
     print(f"Batch Size: {batch_size}")
     print(f"Top K Passages: {top_k_passages}")
     
+    results = {}
 
     for k in prec_k_dict.keys():
         print(f"Precision@{k} Bandit: {np.mean(prec_k_dict[k])}\n")
         print(f"Recall@{k} Bandit: {np.mean(rec_k_dict[k])}\n")
         print(f"MAP@{k} Bandit: {np.mean(map_k_dict[k])}\n")
-        
+        results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
+        results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
+        results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
+
+    if save_flag:
+        assert save_results(configs, results, result_path) == True, "Results not saved"
+        print(f"Results saved to {result_path}")
+
 if __name__ == "__main__":
     main() 

@@ -1,7 +1,7 @@
 from src.Dataset.travel_dest import TravelDest
 from src.Retrieval.retrieval import dense_retrieval
 from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import fusion_score, eval_rec
+from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
 
 import numpy as np
 from tqdm import tqdm
@@ -20,14 +20,20 @@ def main():
 
 
 
-    ################### COnfiguration ###################
+    ################### Configuration ###################
     verbose=False
-    k_start = 10
+    k_start_initial = 10
     k_eval = 50
     k_retrieval = min(1000, len(prelabel_relevance))
     top_k_passages = 5
-
+    save_flag = True
     
+    configs = {
+        "k_retrieval": k_retrieval,
+        "top_k_passages": top_k_passages
+    }
+
+    result_path = f"{dataset_name}_{model_name}_baseline_results.csv"
     
     ################### Evaluation ###################
     prec_k_dict = defaultdict(list)
@@ -37,7 +43,7 @@ def main():
     for q_id, query_embedding in tqdm(zip(question_ids, query_embeddings), desc="Query", total=len(question_ids)):
         item, score = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval= k_retrieval, return_score=True)
         
-        k_start = 10
+        k_start = k_start_initial
         bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
         while k_start <= k_eval:
             prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[q_id].keys()), k_start, verbose=verbose)
@@ -57,11 +63,18 @@ def main():
         print(f"K Retrieval: {k_retrieval}")
         print(f"Top K Passages: {top_k_passages}")
         
+        results = {}
         for k in prec_k_dict.keys():
             print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
             print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
             print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
+            results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
+            results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
+            results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
 
+    if save_flag:
+        assert save_results(configs, results, result_path) == True, "Results not saved"
+        print(f"Results saved to {result_path}")
 
 if __name__ == "__main__":
     main()

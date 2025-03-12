@@ -44,7 +44,7 @@ class RetrievalGPUCB:
         self.gp = GaussianProcessRegressor(
             kernel=kernel,
             alpha=1e-6,  # Small noise to avoid numerical issues
-            normalize_y=False,
+            normalize_y=True,
             n_restarts_optimizer=5
         )
     

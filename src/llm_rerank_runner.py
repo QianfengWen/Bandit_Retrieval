@@ -1,7 +1,7 @@
 from src.Dataset.travel_dest import TravelDest
 from src.Retrieval.retrieval import llm_rerank
 from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import fusion_score, eval_rec
+from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
 
 import numpy as np
 from tqdm import tqdm
@@ -20,14 +20,20 @@ def main():
 
 
 
-    ################### COnfiguration ###################
+    ################### Configuration ###################
     verbose=False
     k_start = 10
     k_eval = 50
     budget = min(1000, len(prelabel_relevance))
     top_k_passages = 5
-
+    save_flag = True
     
+    configs = {
+        "budget": budget,
+        "top_k_passages": top_k_passages
+    }
+
+    result_path = f"{dataset_name}_{model_name}_llm_reranking_results.csv"
     
     ################### Evaluation ###################
     prec_k_dict = defaultdict(list)
@@ -57,11 +63,18 @@ def main():
         print(f"LLM Budget: {budget}")
         print(f"Top K Passages: {top_k_passages}")
         
+        results = {}
         for k in prec_k_dict.keys():
             print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
             print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
             print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
+            results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
+            results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
+            results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
 
+    if save_flag:
+        assert save_results(configs, results, result_path) == True, "Results not saved"
+        print(f"Results saved to {result_path}")
 
 if __name__ == "__main__":
     main()
