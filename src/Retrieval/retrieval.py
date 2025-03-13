@@ -18,7 +18,8 @@ def bandit_retrieval(
         beta=2.0, 
         llm_budget: int=10, 
         k_cold_start: int=5, 
-        k_retrieval: int=1000, 
+        k_retrieval: int=1000,
+        kernel: str="rbf", 
         batch_size: int=10, 
         verbose: bool=False, 
         return_score: bool=False, 
@@ -50,7 +51,7 @@ def bandit_retrieval(
     
     k_cold_start = min(k_cold_start, llm_budget)
     
-    gpucb = RetrievalGPUCB(beta=beta) # set up GP-UCB
+    gpucb = RetrievalGPUCB(beta=beta, kernel=kernel) # set up GP-UCB
     
     available_ids = passage_ids.copy()
     id_to_embedding = {pid: emb for pid, emb in zip(passage_ids, passage_embeddings)}
@@ -133,7 +134,7 @@ def bandit_retrieval(
     # return the top-k passages based on final GP predictions
     top_k_idx, top_k_scores = gpucb.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
-        
+
     if return_score:
         return top_k_ids, top_k_scores
 
