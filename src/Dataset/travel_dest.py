@@ -2,7 +2,7 @@ from collections import defaultdict
 import os
 import json
 import unicodedata
-
+import pdb
 class TravelDest():
     def load_dataset(self):
         file_names = os.listdir("data/travel_dest/corpus")
@@ -31,7 +31,7 @@ class TravelDest():
         with open(f"data/travel_dest/ground_truth.json", "r", encoding='utf-8') as f:
             qrels_iter = json.load(f)
 
-        with open(f"data/travel_dest/rating_results.csv", "r", encoding='utf-8') as f:
+        with open(f"data/travel_dest/cache.csv", "r", encoding='utf-8') as f:
             prelabel_relevance = defaultdict(dict)
             f.readline()
             for line in f:
@@ -60,17 +60,10 @@ class TravelDest():
 
     def load_passages(self):
         passage_map = dict()
-        sub = dict()
-
         for passage_id, passage in enumerate(self.passages):
-            if passage in passage_map:
-                sub[passage_id] = passage_map[passage]
-            else:
-                passage_map[passage] = passage_id
-
-        self.passage_sub = sub
-        passage_ids = list(passage_map.values())
-        passage_texts = list(passage_map.keys())
+            passage_map[passage_id] = passage
+        passage_ids = list(passage_map.keys())
+        passage_texts = list(passage_map.values())
         return passage_ids, passage_texts
     
     def create_relevance_map(self, question_texts):
@@ -100,3 +93,9 @@ class TravelDest():
         passage_city_map = self.create_passage_ids_to_city_map(self.passage_dict, passage_ids, passage_texts)
         
         return question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map, prelabel_relevance
+    
+
+if __name__ == "__main__":
+    dataset = TravelDest()
+    question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map, prelabel_relevance = dataset.load_data()
+    pdb.set_trace()

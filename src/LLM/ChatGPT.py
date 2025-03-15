@@ -3,6 +3,7 @@ from src.LLM.llm import LLM
 from typing import Optional, Union
 from pydantic import BaseModel
 import os, json, csv
+from collections import defaultdict
 
 class Scores(BaseModel):
     scores: dict[str, int]
@@ -105,8 +106,9 @@ class ChatGPT(LLM):
         try:
             scores = json.loads(response)["scores"]
             scores = [scores.get(str(i), -1) for i in range(len(passages))] 
-            
-            if cache and update_cache and query_id is not None and passage_ids is not None:
+            if update_cache and query_id is not None and passage_ids is not None:
+                cache = cache or defaultdict(dict)
+                cache.setdefault(query_id, {})
                 new_entries = []
                 
                 for p_id, score in zip(passage_ids, scores):

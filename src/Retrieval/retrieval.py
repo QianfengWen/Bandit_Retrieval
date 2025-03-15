@@ -2,7 +2,7 @@ import numpy as np
 from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from src.LLM.llm import LLM
 from tqdm import tqdm
-
+import random
 
 def calculate_cosine_similarity(query_embeddings, passage_embeddings):
     return np.dot(query_embeddings, passage_embeddings.T)
@@ -64,6 +64,8 @@ def bandit_retrieval(
     if query_embedding is not None and k_cold_start > 0:
         cold_start_idx = np.argsort(cosine_similairty_matrix)[::-1][:k_cold_start]
         cold_start_ids = [passage_ids[idx] for idx in cold_start_idx]
+
+        random.shuffle(cold_start_ids)
         cold_start_batches = [cold_start_ids[i:i + batch_size] for i in range(0, len(cold_start_ids), batch_size)]
         
         for batch in cold_start_batches:
@@ -115,7 +117,7 @@ def bandit_retrieval(
         passage_idxs = [passage_ids.index(next_id) for next_id in next_ids]
         batch_passages = [passages[idx] for idx in passage_idxs]
 
-        batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=batch, cache=cache, update_cache=update_cache)
+        batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=next_ids, cache=cache, update_cache=update_cache)
 
         for next_id, score in zip(next_ids, batch_scores):
             scores[next_id] = score

@@ -24,9 +24,10 @@ def main():
     dataset = TravelDest()
     dataset_name = "travel_dest"
     model_name = "all-MiniLM-L6-v2"
-    batch_size = 5
+    batch_size = 1
+    num = 1000
 
-    output_path = "data/travel_dest/rating_results.csv"
+    output_path = "data/travel_dest/cache.csv"
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
 
@@ -48,7 +49,7 @@ def main():
 
             # Compute similarity matrix
             similarity_matrix = calculate_cosine_similarity(query_embedding, passage_embeddings)
-            sorted_indices = np.argsort(similarity_matrix)[::-1][:1000]
+            sorted_indices = np.argsort(similarity_matrix)[::-1][:num]
 
             # Create sorted list of (passage_id, passage) pairs
             sorted_passage = [(int(passage_ids[i]), passages[i]) for i in sorted_indices]
