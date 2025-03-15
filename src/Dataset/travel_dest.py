@@ -94,6 +94,17 @@ class TravelDest():
         
         return question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map, prelabel_relevance
     
+    def load_cache(self):
+        with open(f"data/travel_dest/cache.csv", "r", encoding='utf-8') as f:
+            prelabel_relevance = defaultdict(dict)
+            f.readline()
+            for line in f:
+                query_id, doc_id, score = line.split(',')
+                query_id = int(query_id.strip(" \n"))
+                doc_id = int(doc_id.strip(" \n"))
+                score = int(score.strip(" \n"))
+                prelabel_relevance[query_id][doc_id] = score
+        return prelabel_relevance
 
 if __name__ == "__main__":
     dataset = TravelDest()

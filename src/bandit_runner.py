@@ -25,18 +25,18 @@ def main():
 
     # top_k_passages_list = [1, 3, 5, 10, 15, 20, 25, 30, 40, 50]
     # llm_budget_list = [10, 20, 50, 100, 200, 300, 400, 600, 800, 1000]
-    cold_start_list = [180, 160, 140, 120, 100, 80, 60, 40, 20, 10]
+    cold_start_list = [70, 60, 50, 40, 30, 20, 10]
     for k_cold_start in cold_start_list:
         ############## Config ##############
         llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
         beta = 2.0
-        llm_budget = 200
+        llm_budget = 100
         k_cold_start = k_cold_start
         kernel = "rbf"
-        batch_size = 1
+        batch_size = 5
         k_retrieval = 1000
         # cache = None
-        cache = prelabel_relevance
+        cache = dataset.load_cache()
         update_cache = "data/travel_dest/cache.csv"
         # update_cache = None
         verbose = False
