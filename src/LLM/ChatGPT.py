@@ -74,7 +74,21 @@ class ChatGPT(LLM):
             except Exception as e:
                 print(f"Caching error: {e}, using LLM ...")
 
+        # cache miss for some passages
+        cache = cache or defaultdict(dict)
+        cache.setdefault(query_id, {})
 
+        few_shot_examples = {
+            passage: cache[query_id][pid] 
+            for pid, passage in zip(passage_ids, passages) 
+            if pid in cache[query_id]
+        }
+
+        if few_shot_examples:
+            few_shot_texts = f"Attached are example ratings:\n{json.dumps(few_shot_examples, indent=2)}"
+        else:
+            few_shot_texts = ""
+        
         formatted_passages = "\n".join([f"{i+1}. {p}" for i, p in enumerate(passages)])
         prompt_template = """
         Given a query and a list of passages, you must provide a score on an integer scale of 0 to 3 with the following meanings:
@@ -94,11 +108,13 @@ class ChatGPT(LLM):
         Measure how trustworthy the passage is (T).
         Consider the aspects above and the relative importance of each, and decide on a final score (O). Final score must be an integer value only.
         Do not provide any code in result. Return a JSON object mapping passage index to its relevance score, the index starts from 0.
+        
+        {few_shot_texts}
         """
-
+        print(prompt_template.format(query=query, passages=formatted_passages, few_shot_texts=few_shot_texts))
         prompt = [
             {"role": "system", "content": "You are an assistant that evaluates the relevance of passages to a given query. "},
-            {"role": "user", "content": prompt_template.format(query=query, passages=formatted_passages)}
+            {"role": "user", "content": prompt_template.format(query=query, passages=formatted_passages, few_shot_texts=few_shot_texts)}
         ]
 
         response = self.generate(prompt, response_format=response_format)
@@ -107,8 +123,6 @@ class ChatGPT(LLM):
             scores = json.loads(response)["scores"]
             scores = [scores.get(str(i), -1) for i in range(len(passages))] 
             if update_cache and query_id is not None and passage_ids is not None:
-                cache = cache or defaultdict(dict)
-                cache.setdefault(query_id, {})
                 new_entries = []
                 
                 for p_id, score in zip(passage_ids, scores):
