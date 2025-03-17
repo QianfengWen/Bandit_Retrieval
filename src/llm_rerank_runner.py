@@ -21,11 +21,11 @@ def main():
 
 
     ################### Configuration ###################
-    for budget in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
+    for budget in [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
         verbose=False
         k_start = 10
         k_eval = 50
-        # budget = min(1000, len(prelabel_relevance))
+        budget = budget
         top_k_passages = 5
         save_flag = True
     
@@ -42,6 +42,7 @@ def main():
         map_k_dict = defaultdict(list)
 
         for q_id, query_embedding in tqdm(zip(question_ids, query_embeddings), desc="Query", total=len(question_ids)):
+            
             item, score = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval= budget, cache=prelabel_relevance, return_score=True)
             
             k_start = 10
@@ -57,21 +58,21 @@ def main():
                     print(f"MAP@{k_start}: {map_k}")
                 k_start += 10
                 
-                if verbose:
-                    print("\n\n\n\n\n")
+            if verbose:
+                print("\n\n\n\n\n")
 
-            print("=== LLM Reranking Demo ===")
-            print(f"LLM Budget: {budget}")
-            print(f"Top K Passages: {top_k_passages}")
-            
-            results = {}
-            for k in prec_k_dict.keys():
-                print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
-                print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
-                print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
-                results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
-                results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
-                results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
+        print("=== LLM Reranking Demo ===")
+        print(f"LLM Budget: {budget}")
+        print(f"Top K Passages: {top_k_passages}")
+        
+        results = {}
+        for k in prec_k_dict.keys():
+            print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
+            print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
+            print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
+            results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
+            results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
+            results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
 
         if save_flag:
             assert save_results(configs, results, result_path) == True, "Results not saved"

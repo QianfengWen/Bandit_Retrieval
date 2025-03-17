@@ -45,7 +45,8 @@ class RetrievalGPUCB:
             kernel=kernel,
             alpha=1e-6,  # Small noise to avoid numerical issues
             normalize_y=True,
-            n_restarts_optimizer=5
+            n_restarts_optimizer=5,
+            random_state=42
         )
     
     def update(self, x, reward):

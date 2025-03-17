@@ -179,7 +179,11 @@ def llm_rerank(
     passage_ids = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval=k_retrieval, return_score=False)
     if cache:
         try:
-            sorted_item = sorted(cache[query_id].items(), key=lambda x: x[1], reverse=True)[:k_retrieval]
+            valid_cached_items = {
+                pid: score for pid, score in cache[query_id].items() if pid in passage_ids
+            }
+            
+            sorted_item = sorted(valid_cached_items.items(), key=lambda x: x[1], reverse=True)[:k_retrieval]            
             sorted_passages = [int(key) for key, _ in sorted_item]
             if return_score:
                 sorted_scores = [value for _, value in sorted_item]
