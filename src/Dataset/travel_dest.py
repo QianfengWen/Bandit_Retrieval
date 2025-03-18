@@ -4,7 +4,9 @@ import json
 import unicodedata
 import pdb
 class TravelDest():
-    def load_dataset(self):
+    def load_dataset(self, cache_path="data/travel_dest/cache.csv"):
+        self.cache_path = cache_path
+        
         file_names = os.listdir("data/travel_dest/corpus")
         file_names = sorted(file_names)
 
@@ -31,15 +33,7 @@ class TravelDest():
         with open(f"data/travel_dest/ground_truth.json", "r", encoding='utf-8') as f:
             qrels_iter = json.load(f)
 
-        with open(f"data/travel_dest/cache.csv", "r", encoding='utf-8') as f:
-            prelabel_relevance = defaultdict(dict)
-            f.readline()
-            for line in f:
-                query_id, doc_id, score = line.split(',')
-                query_id = int(query_id.strip(" \n"))
-                doc_id = int(doc_id.strip(" \n"))
-                score = int(score.strip(" \n"))
-                prelabel_relevance[query_id][doc_id] = score
+        prelabel_relevance = self.load_cache()
         
         return queries, passages, qrels_iter, passage_dict, cities, prelabel_relevance
                    
@@ -95,7 +89,7 @@ class TravelDest():
         return question_ids, question_texts, passage_ids, passage_texts, relevance_map, passage_city_map, prelabel_relevance
     
     def load_cache(self):
-        with open(f"data/travel_dest/cache.csv", "r", encoding='utf-8') as f:
+        with open(self.cache_path, "r", encoding='utf-8') as f:
             prelabel_relevance = defaultdict(dict)
             f.readline()
             for line in f:

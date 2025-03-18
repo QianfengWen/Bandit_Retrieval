@@ -3,13 +3,14 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
 import matplotlib.pyplot as plt
 import time
+AQ_FUNCS = ['ucb', 'random', 'greedy']
 
 class RetrievalGPUCB:
     """
     GP-UCB implementation specifically for retrieval tasks.
     """
     
-    def __init__(self, beta=2.0, kernel='rbf'):
+    def __init__(self, beta=2.0, kernel='rbf', acquisition_function='ucb'):
         """
         Initialize the GP-UCB algorithm for retrieval
         
@@ -17,7 +18,6 @@ class RetrievalGPUCB:
             beta: Exploration parameter that balances exploitation vs exploration
             is_embeddings_based: Whether to use embeddings (True) or indices (False) as features
         """
-        self.beta = beta
         self.is_fitted = False
         # Observations
         self.X = []  # Features of observed points (indices or embeddings)
@@ -48,6 +48,13 @@ class RetrievalGPUCB:
             n_restarts_optimizer=5,
             random_state=42
         )
+
+        if acquisition_function in AQ_FUNCS:
+            self.acquisition_function = acquisition_function
+            if self.acquisition_function == 'ucb':
+                self.beta = beta
+            else:
+                self.beta = 0
     
     def update(self, x, reward):
         """
@@ -142,6 +149,10 @@ class RetrievalGPUCB:
         if not self.X:
             # Cold start: if no observations yet, just return the first n candidates
             return np.arange(min(n, len(candidates)))
+        
+        if self.acquisition_function == 'random':
+            # Random selection for comparison
+            return np.random.choice(len(candidates), n, replace=False)
         
         # Convert candidates to appropriate format
         X_candidates = self._process_candidates(candidates)

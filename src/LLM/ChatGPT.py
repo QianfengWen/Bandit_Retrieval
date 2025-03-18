@@ -111,7 +111,6 @@ class ChatGPT(LLM):
         
         {few_shot_texts}
         """
-        print(prompt_template.format(query=query, passages=formatted_passages, few_shot_texts=few_shot_texts))
         prompt = [
             {"role": "system", "content": "You are an assistant that evaluates the relevance of passages to a given query. "},
             {"role": "user", "content": prompt_template.format(query=query, passages=formatted_passages, few_shot_texts=few_shot_texts)}
