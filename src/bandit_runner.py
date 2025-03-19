@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 
-def main():
+def main(beta=3.0, llm_budget=10, k_cold_start=10, k_retrieval=1000, top_k_passages=5, batch_size=5, acq_func="ucb"):
     ############## Load Dataset ##############
     dataset = TravelDest()
     dataset_name = "travel_dest"
@@ -30,28 +30,27 @@ def main():
     ############## Config ##############
     cache_path = f"data/{dataset_name}/cache.csv"
     output_prefix = f"output/{dataset_name}/{model_name}"
-    evaluation_path = f"{output_prefix}/evaluation_results.json"
-    retrieval_results_path = f"{output_prefix}/retrieval_results.json"
+    
 
     os.makedirs(output_prefix, exist_ok=True)
 
 
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
-    beta = 3
-    llm_budget = 5
-    k_cold_start = 0
+    beta = beta
+    llm_budget = llm_budget
+    k_cold_start = k_cold_start
     kernel = "rbf"
-    acq_func = "random"
-    batch_size = 5
-    k_retrieval = 1000
+    acq_func = acq_func
+    batch_size = batch_size
+    k_retrieval = k_retrieval
     # cache = None
     cache = dataset.load_cache()
-    update_cache = cache_path
-    # update_cache = None
+    # update_cache = cache_path
+    update_cache = None
     verbose = False
     k_eval = 50
     k_start = 10
-    top_k_passages = 5
+    top_k_passages = top_k_passages
     save_flag = True
 
     gpucb_percentage = (llm_budget - k_cold_start) / llm_budget
@@ -66,6 +65,8 @@ def main():
         "top_k_passages": top_k_passages,
         "batch_size": batch_size
     }
+    evaluation_path = f"{output_prefix}/{model_name}_{beta}_{llm_budget}_{k_cold_start}_{k_retrieval}_{top_k_passages}_{batch_size}_{acq_func}_evaluation_results.json"
+    retrieval_results_path = f"{output_prefix}/{model_name}_{beta}_{llm_budget}_{k_cold_start}_{k_retrieval}_{top_k_passages}_{batch_size}_{acq_func}_retrieval_results.json"
 
     ############## Evaluation ##############
     retrieval_cities = defaultdict()

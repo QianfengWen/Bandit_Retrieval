@@ -5,6 +5,7 @@ __pycache__/
 
 # igonore data folder
 data/
+plots/
 
 # C extensions
 *.so
