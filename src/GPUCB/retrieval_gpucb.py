@@ -152,6 +152,7 @@ class RetrievalGPUCB:
         
         if self.acquisition_function == 'random':
             # Random selection for comparison
+            np.random.seed(42)
             return np.random.choice(len(candidates), n, replace=False)
         
         # Convert candidates to appropriate format

@@ -16,6 +16,7 @@ def bandit_retrieval(
         query_embedding, 
         query_id, 
         beta=2.0, 
+        acq_func="ucb",
         llm_budget: int=10, 
         k_cold_start: int=5, 
         k_retrieval: int=1000,
@@ -51,7 +52,7 @@ def bandit_retrieval(
     
     k_cold_start = min(k_cold_start, llm_budget)
     
-    gpucb = RetrievalGPUCB(beta=beta, kernel=kernel) # set up GP-UCB
+    gpucb = RetrievalGPUCB(beta=beta, kernel=kernel, acquisition_function=acq_func) # set up GP-UCB
     
     available_ids = passage_ids.copy()
     id_to_embedding = {pid: emb for pid, emb in zip(passage_ids, passage_embeddings)}
