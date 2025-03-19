@@ -33,13 +33,13 @@ def main():
     evaluation_path = f"{output_prefix}/evaluation_results.json"
     retrieval_results_path = f"{output_prefix}/retrieval_results.json"
 
-    os.makedirs(f"output/{dataset_name}", exist_ok=True)
+    os.makedirs(output_prefix, exist_ok=True)
 
 
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
     beta = 3
-    llm_budget = 100
-    k_cold_start = 50
+    llm_budget = 5
+    k_cold_start = 0
     kernel = "rbf"
     acq_func = "random"
     batch_size = 5
