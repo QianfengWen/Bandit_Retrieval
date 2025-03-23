@@ -26,16 +26,16 @@ class RetrievalGPUCB:
         # Setup GP regressor with appropriate kernel: 
         # 1. RBF
         if kernel == "rbf":
-            kernel = C(1.0) * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
         # 2. Matern
         elif kernel == 'matern':
-            kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+            kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
         # 3. Rational Quadratic
         elif kernel == 'rational_quadratic':
-            kernel = C(1.0) * RationalQuadratic(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+            kernel = C(1.0) * RationalQuadratic(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
         # 4. Exponential
         elif kernel == 'exp_sine_squared':
-            kernel = C(1.0) * ExpSineSquared(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+            kernel = C(1.0) * ExpSineSquared(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
         # 5. Dot Product
         elif kernel == 'dot_product':
             kernel = C(1.0) * DotProduct()
@@ -45,7 +45,7 @@ class RetrievalGPUCB:
             kernel=kernel,
             alpha=1e-6,  # Small noise to avoid numerical issues
             normalize_y=True,
-            n_restarts_optimizer=5,
+            n_restarts_optimizer=100,
             random_state=42
         )
 

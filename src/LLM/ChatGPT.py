@@ -66,13 +66,16 @@ class ChatGPT(LLM):
                 return target_ratings
             
             except KeyError:
-                print(f"Cache miss for query {query_id}, using LLM ...")
+                # print(f"Cache miss for query {query_id}, using LLM ...")
+                pass
 
             except AssertionError:
-                print("Cache is enabled but query_id and passage_ids are not provided, using LLM ...")
+                # print("Cache is enabled but query_id and passage_ids are not provided, using LLM ...")
+                pass
             
             except Exception as e:
-                print(f"Caching error: {e}, using LLM ...")
+                # print(f"Caching error: {e}, using LLM ...")
+                pass
 
         # cache miss for some passages
         cache = cache or defaultdict(dict)
@@ -129,7 +132,7 @@ class ChatGPT(LLM):
                         new_entries.append([query_id, p_id, score])
 
                 if new_entries:
-                    print(f"Updating cache with {len(new_entries)} new entries ...")
+                    # print(f"Updating cache with {len(new_entries)} new entries ...")
                     file_exists = os.path.exists(update_cache)
                     
                     with open(update_cache, mode='a', newline='', encoding='utf-8') as csvfile:

@@ -1,6 +1,8 @@
 from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k
+from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from collections import defaultdict
 import pandas as pd
+import numpy as np
 
 def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, return_scores=False):
     """
@@ -40,6 +42,72 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
         return dict(sorted_cities)  # return {city: score} if return_scores=True
     else:
         return [city for city, _ in sorted_cities] 
+
+
+def fusion_score_gp(
+        gp: RetrievalGPUCB, 
+        passage_ids: list, 
+        passage_dict: dict[list], 
+        passage_embeddings: np.array, 
+        top_k_passages=5, 
+        k_retrieval=1000,
+        return_scores=False, 
+        fusion_method="mean"
+    ):
+    """
+    Aggregate scores by city based on top-rated passages.
+
+    Args:
+        gp (RetrievalGPUCB): GP-UCB model instance.
+        passage_ids (list): List of passage IDs.
+        passage_dict (dict): Mapping from city ID to passage IDs.
+        passage_embeddings (np.array): Array of passage embeddings.
+        top_k_passages (int): Number of top-rated passages to consider for each city.
+        return_scores (bool): If True, return both cities and scores.
+        fusion_method (str): "mean" or "max".
+
+    Returns:
+        list or dict: 
+            - If return_scores=False: List of cities sorted by average top-k score.
+            - If return_scores=True: Dict of {city: average score}, sorted by score.
+    """
+
+    # Create a lookup for fast ID-to-index mapping (O(1) lookup)
+    id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
+    city_scores = {}
+
+    _, scores = gp.get_top_k(passage_embeddings, k_retrieval, return_scores=True)
+    top_k_cutoff = scores[-1]
+
+    for city_id, city_passage_ids in passage_dict.items():
+        # Use list comprehension with direct lookup
+        city_passage_idx = [id_to_index[pid] for pid in city_passage_ids]
+        city_passage_embeddings = passage_embeddings[city_passage_idx]
+
+        # Get top-k passages and scores
+        if len(city_passage_embeddings) > 0:
+            _, selected_scores = gp.get_top_k(
+                city_passage_embeddings, 
+                top_k_passages, 
+                return_scores=True
+            )
+        filtered_scores = [score for score in selected_scores if score > top_k_cutoff]
+
+        if fusion_method == "mean":
+            city_scores[city_id] = sum(filtered_scores) if filtered_scores else 0
+        elif fusion_method == "max":
+            city_scores[city_id] = max(filtered_scores) if filtered_scores else 0
+        else:
+            raise ValueError("Invalid fusion method: Use 'mean' or 'max'")
+
+    # Sort cities by score in descending order
+    sorted_cities = sorted(city_scores.items(), key=lambda x: x[1], reverse=True)
+
+    if return_scores:
+        return dict(sorted_cities)
+    else:
+        return [city for city, _ in sorted_cities]
+
 
 
 def eval_rec(cities, ground_truth, k, verbose=False):
