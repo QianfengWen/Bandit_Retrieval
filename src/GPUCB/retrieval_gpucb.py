@@ -1,6 +1,8 @@
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
+from src.utils import random_seed
+import scipy
 import matplotlib.pyplot as plt
 import time
 AQ_FUNCS = ['ucb', 'random', 'greedy']
@@ -26,7 +28,7 @@ class RetrievalGPUCB:
         # Setup GP regressor with appropriate kernel: 
         # 1. RBF
         if kernel == "rbf":
-            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
+            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=2.0, length_scale_bounds=(1e-5, 1e5))
         # 2. Matern
         elif kernel == 'matern':
             kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
@@ -39,14 +41,20 @@ class RetrievalGPUCB:
         # 5. Dot Product
         elif kernel == 'dot_product':
             kernel = C(1.0) * DotProduct()
-        
+
+        def optimizer(obj_func, x0, bounds):
+            res = scipy.optimize.minimize(
+                obj_func, x0, bounds=bounds, method="L-BFGS-B", jac=True,
+                options={'maxiter': 100})
+            return res.x, res.fun
             
         self.gp = GaussianProcessRegressor(
             kernel=kernel,
-            alpha=1e-6,  # Small noise to avoid numerical issues
+            alpha=1e-3,  # Small noise to avoid numerical issues
             normalize_y=True,
-            n_restarts_optimizer=100,
-            random_state=42
+            n_restarts_optimizer=5,
+            random_state=42,
+            optimizer=optimizer
         )
 
         if acquisition_function in AQ_FUNCS:
@@ -152,7 +160,7 @@ class RetrievalGPUCB:
         
         if self.acquisition_function == 'random':
             # Random selection for comparison
-            np.random.seed(42)
+            np.random.seed(random_seed)
             return np.random.choice(len(candidates), n, replace=False)
         
         # Convert candidates to appropriate format

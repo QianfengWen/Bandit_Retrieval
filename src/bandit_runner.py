@@ -3,15 +3,13 @@ from src.LLM.ChatGPT import ChatGPT
 from src.Dataset.travel_dest import TravelDest
 from src.Embedding.embedding import handle_embeddings
 from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
-
 from collections import defaultdict
 import numpy as np
 import os, json
 from tqdm import tqdm
 
-
-
-def main(beta=3.0, llm_budget=200, k_cold_start=80, k_retrieval=1000, top_k_passages=5, batch_size=5, acq_func="random"):
+random_seed = 42
+def main(beta=3.0, llm_budget=200, k_cold_start=100, k_retrieval=1000, top_k_passages=5, batch_size=5, acq_func="random", fusion_mode="sum"):
     ############## Load Dataset ##############
     dataset = TravelDest()
     dataset_name = "travel_dest"
@@ -33,9 +31,6 @@ def main(beta=3.0, llm_budget=200, k_cold_start=80, k_retrieval=1000, top_k_pass
     
     os.makedirs(f"{output_prefix}/evaluation_results", exist_ok=True)
     os.makedirs(f"{output_prefix}/retrieval_results", exist_ok=True)
-
-    
-
 
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
     beta = beta
@@ -67,8 +62,8 @@ def main(beta=3.0, llm_budget=200, k_cold_start=80, k_retrieval=1000, top_k_pass
         "top_k_passages": top_k_passages,
         "batch_size": batch_size
     }
-    evaluation_path = f"{output_prefix}/evaluation_results/{model_name}_{beta}_{llm_budget}_{k_cold_start}_{k_retrieval}_{top_k_passages}_{batch_size}_{acq_func}.csv"
-    retrieval_results_path = f"{output_prefix}/retrieval_results/{model_name}_{beta}_{llm_budget}_{k_cold_start}_{k_retrieval}_{top_k_passages}_{batch_size}_{acq_func}.json"
+    evaluation_path = f"{output_prefix}/{model_name}_{beta}_{llm_budget}_{k_cold_start}_{k_retrieval}_{top_k_passages}_{batch_size}_{acq_func}_{random_seed}_{fusion_mode}_evaluation_results.json"
+    retrieval_results_path = f"{output_prefix}/{model_name}_{beta}_{llm_budget}_{k_cold_start}_{k_retrieval}_{top_k_passages}_{batch_size}_{acq_func}_{random_seed}_{fusion_mode}_retrieval_results.json"
 
     ############## Evaluation ##############
     retrieval_cities = defaultdict()
@@ -106,7 +101,7 @@ def main(beta=3.0, llm_budget=200, k_cold_start=80, k_retrieval=1000, top_k_pass
         if verbose:
             print("\n********* Results: **********")
 
-        bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
+        bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False, fusion_mode=fusion_mode)
         retrieval_cities[query_id] = bandit_cities
 
         k_start = 10
@@ -128,7 +123,6 @@ def main(beta=3.0, llm_budget=200, k_cold_start=80, k_retrieval=1000, top_k_pass
     with open(f"found.json", "w", encoding='utf-8') as f:
         json.dump(found_dict, f, indent=4)
 
-    
     print("=== Bandit Retrieval Demo ===")
     print(f"Model: {model_name}")
     print(f"Dataset: {dataset_name}")
@@ -140,6 +134,9 @@ def main(beta=3.0, llm_budget=200, k_cold_start=80, k_retrieval=1000, top_k_pass
     print(f"Retrieval K: {k_retrieval}")
     print(f"Batch Size: {batch_size}")
     print(f"Top K Passages: {top_k_passages}")
+    print(f"GP-UCB Percentage: {gpucb_percentage}")
+    print(f"Random Seed: {random_seed}")
+    print(f"Fusion Mode: {fusion_mode}")
     
     results = {}
 

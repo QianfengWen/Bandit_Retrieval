@@ -117,9 +117,6 @@ def sample(
 
         return sampled_ids
 
-
-
-
 def gp_retrieval(
         # Core input data
         query: str, 
@@ -229,8 +226,6 @@ def gp_retrieval(
     ############### Return Results ################
     return gpucb
 
-
-
 def bandit_retrieval(
         passage_ids: list, 
         passage_embeddings: list, 
@@ -291,6 +286,8 @@ def bandit_retrieval(
         cold_start_ids = [passage_ids[idx] for idx in cold_start_idx]
 
         random.shuffle(cold_start_ids)
+        print("there are ", len(cold_start_ids), " cold start ids")
+        print("cold start ids: ", cold_start_ids)
         cold_start_batches = [cold_start_ids[i:i + batch_size] for i in range(0, len(cold_start_ids), batch_size)]
         
         for batch in cold_start_batches:
@@ -313,7 +310,6 @@ def bandit_retrieval(
                 # update GP-UCB model using the passage embedding as feature
                 gpucb.update(id_to_embedding[target_id], score)
             
-
             if verbose: # debug print
                 print("batch_scores: ", batch_scores)
 
@@ -332,9 +328,11 @@ def bandit_retrieval(
             break  
 
         available_embeddings = [id_to_embedding[pid] for pid in available_ids]
-
+        print("there are ", len(available_ids), " available embeddings")
+        
         next_embedding_idxs = gpucb.select(available_embeddings, batch_size) 
         next_ids = [available_ids[idx] for idx in next_embedding_idxs] 
+        print("Next IDs: ", next_ids)
 
         for next_id in next_ids:
             available_ids.remove(next_id)
@@ -363,7 +361,7 @@ def bandit_retrieval(
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
     if return_score:
-        return top_k_ids, top_k_scores
+        return top_k_ids, top_k_scores, observed_ids
 
     return top_k_ids
     

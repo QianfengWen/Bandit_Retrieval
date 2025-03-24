@@ -46,7 +46,7 @@ def main():
             item, score = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval= budget, cache=prelabel_relevance, return_score=True)
             
             k_start = 10
-            bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
+            bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False, fusion_mode="average")
             while k_start <= k_eval:
                 prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[q_id].keys()), k_start, verbose=verbose)
                 prec_k_dict[k_start].append(prec_k)

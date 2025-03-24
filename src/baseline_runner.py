@@ -25,9 +25,9 @@ def main():
     ################### Configuration ###################
     verbose=False
     k_start_initial = 10
-    k_eval = 10
+    k_eval = 50
     k_retrieval = 1000
-    top_k_passages = 50
+    top_k_passages = 5
     save_flag = True
     
     configs = {
@@ -44,18 +44,18 @@ def main():
 
     for q_id, query_embedding in tqdm(zip(question_ids, query_embeddings), desc="Query", total=len(question_ids)):
         print("=== Dense Retrieval Demo ===")
-        print("query_id: ", q_id)
-        print("query_embedding: ", query_embedding.shape)
-        print("passage_embeddings: ", passage_embeddings.shape)
+        # print("query_id: ", q_id)
+        # print("query_embedding: ", query_embedding.shape)
+        # print("passage_embeddings: ", passage_embeddings.shape)
         item, score = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval = k_retrieval, return_score=True)
-        print("item: ", item)
-        print("score: ", score)
-        for pid, sc in zip(item, score):
-            print("\npassage: ", passages[pid].encode('utf-8')  )
-            print("score: ", sc)
+        # print("item: ", item)
+        # print("score: ", score)
+        # for pid, sc in zip(item, score):
+        #     print("\npassage: ", passages[pid].encode('utf-8')  )
+        #     print("score: ", sc)
         
         k_start = k_start_initial
-        bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False)
+        bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False, fusion_mode="average")
         while k_start <= k_eval:
             prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[q_id].keys()), k_start, verbose=verbose)
             prec_k_dict[k_start].append(prec_k)
@@ -82,8 +82,6 @@ def main():
             results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
             results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
             results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
-
-        break
 
     if save_flag:
         assert save_results(configs, results, result_path) == True, "Results not saved"

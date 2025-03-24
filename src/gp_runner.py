@@ -9,15 +9,13 @@ import numpy as np
 import os, json
 from tqdm import tqdm
 
-
-
 def main(
         llm_budget=200, 
         sample_strategy="random", 
         top_k=100, 
         top_k_passages=5, 
         batch_size=5, 
-        fusion_method="mean"
+        fusion_method="sum"
     ):
     ############## Load Dataset ##############
     dataset = TravelDest()
@@ -146,4 +144,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(llm_budget=200, top_k=100, sample_strategy="random")
+    main()

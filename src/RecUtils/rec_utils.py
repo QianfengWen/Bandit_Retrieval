@@ -4,7 +4,7 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 
-def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, return_scores=False):
+def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, return_scores=False, fusion_mode="average"):
     """
     Aggregate scores by city based on top-rated passages.
 
@@ -32,11 +32,17 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
     city_average_scores = {}
     for city, city_score_list in city_scores.items():
         top_k_scores = sorted(city_score_list, reverse=True)[:top_k_passages]
-        city_average_scores[city] = sum(top_k_scores) if top_k_scores else 0.0
+        if fusion_mode == "average":
+            city_average_scores[city] = sum(top_k_scores) / len(top_k_scores) if top_k_scores else 0.0
+        elif fusion_mode == "max":
+            city_average_scores[city] = max(top_k_scores) if top_k_scores else 0.0
+        elif fusion_mode == "sum":
+            city_average_scores[city] = sum(top_k_scores) if top_k_scores else 0.0
        
 
     # sort cities by average score in descending order
     sorted_cities = sorted(city_average_scores.items(), key=lambda x: x[1], reverse=True)
+    print("sorted_cities: ", sorted_cities[:50])
 
     if return_scores:
         return dict(sorted_cities)  # return {city: score} if return_scores=True
@@ -94,11 +100,14 @@ def fusion_score_gp(
         filtered_scores = [score for score in selected_scores if score > top_k_cutoff]
 
         if fusion_method == "mean":
-            city_scores[city_id] = sum(filtered_scores) if filtered_scores else 0
+            city_scores[city_id] = sum(filtered_scores) / len(filtered_scores) if filtered_scores else 0
         elif fusion_method == "max":
             city_scores[city_id] = max(filtered_scores) if filtered_scores else 0
+        elif fusion_method == "sum":
+            city_scores[city_id] = sum(filtered_scores) if filtered_scores else 0
         else:
-            raise ValueError("Invalid fusion method: Use 'mean' or 'max'")
+            raise ValueError("Invalid fusion method: Use 'mean', 'max' or 'sum'.")
+    # print("city_scores: \n", city_scores)
 
     # Sort cities by score in descending order
     sorted_cities = sorted(city_scores.items(), key=lambda x: x[1], reverse=True)
@@ -107,8 +116,6 @@ def fusion_score_gp(
         return dict(sorted_cities)
     else:
         return [city for city, _ in sorted_cities]
-
-
 
 def eval_rec(cities, ground_truth, k, verbose=False):
     """
