@@ -1,4 +1,5 @@
 import numpy as np
+from src.GPUCB.gp import GaussianProcess
 from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from src.LLM.llm import LLM
 from tqdm import tqdm
@@ -69,21 +70,9 @@ def sample(
             )
 
         elif sample_strategy == "stratified":
-            # Stratified sampling from the remaining passages
-            num_strata = min(remaining_sample_size, len(remaining_idx))
-            sampled_idx = []
-            if num_strata > 0:
-                strata_size = len(remaining_idx) // num_strata
-                for i in range(num_strata):
-                    start = i * strata_size
-                    end = start + strata_size
-                    if start < len(remaining_idx):
-                        sampled = np.random.choice(
-                            remaining_idx[start:end], 
-                            size=min(1, len(remaining_idx[start:end])), 
-                            replace=False
-                        )
-                        sampled_idx.extend(sampled)
+            strata = np.array_split(remaining_idx, min(remaining_sample_size, len(remaining_idx)))
+            sampled_idx = [np.random.choice(stratum, size=1)[0] for stratum in strata if len(stratum) > 0]
+
 
         # Combine top and stratified/random samples
         remaining_ids = [passage_ids[idx] for idx in sampled_idx]
@@ -127,6 +116,7 @@ def gp_retrieval(
         passages: list, 
         passage_dict: dict[list],
         llm: LLM, 
+        kernel: str = "rbf",
         llm_budget: int = 200, 
         top_k: int = 100,
         sample_strategy: str = "random",
@@ -172,7 +162,7 @@ def gp_retrieval(
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
 
     # Initialize GP-UCB model
-    gpucb = RetrievalGPUCB()
+    gpucb = GaussianProcess(kernel=kernel)
 
     # To store observed scores
     scores = {}
