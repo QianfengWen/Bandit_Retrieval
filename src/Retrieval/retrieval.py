@@ -18,7 +18,8 @@ def sample(
         passage_dict, 
         sample_strategy, 
         sample_size=200, 
-        top_k=100
+        epsilon=0.5,
+        city_max_sample=1
     ):
     """
     Sample passages based on different strategies.
@@ -30,7 +31,8 @@ def sample(
         passage_dict (dict): Mapping of city_id -> list of passage_ids.
         sample_strategy (str): Sampling strategy ("random", "stratified", "city_random", "city_rank").
         sample_size (int): Total number of passages to sample.
-        top_k (int): Top-k passages to consider for each strategy.
+        epsilon (float): Exploration factor (0 = pure exploitation, 1 = pure exploration).
+        city_max_sample (int): Maximum number of passages to sample per city (for city-based strategies).
 
     Returns:
         list: List of sampled passage IDs.
@@ -46,65 +48,94 @@ def sample(
     # Create a fast lookup from passage_id to index
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
 
-    # Compute cosine similarity for ranking
+    # Step 1: Compute cosine similarity for ranking
     cosine_similarity_matrix = calculate_cosine_similarity(query_embedding, passage_embeddings)
     sorted_idx = np.argsort(cosine_similarity_matrix)[::-1]  # Descending order
 
-    if sample_strategy in ["random", "stratified"]:
-        # Top-k sampling from the overall dense retrieval results
+    # Step 2: Split based on epsilon (handle boundary cases)
+    if epsilon == 0:   # Pure exploitation
+        top_k = sample_size
+        explore_k = 0
+    elif epsilon == 1: # Pure exploration
+        top_k = 0
+        explore_k = sample_size
+    else:
+        top_k = int(sample_size * (1 - epsilon))
+        explore_k = sample_size - top_k
+    
+    # Exploitation step — take top-ranked passages
+    top_sampled_ids = []
+    if top_k > 0:
         top_sampled_ids = [passage_ids[idx] for idx in sorted_idx[:top_k]]
 
-        # Remaining sample size after selecting top-k
-        remaining_sample_size = max(0, sample_size - len(top_sampled_ids))
-        remaining_idx = sorted_idx[top_k:]
+    # Exploration step — handle remaining sampling based on strategy
+    remaining_idx = sorted_idx[top_k:]
+    remaining_ids = [passage_ids[idx] for idx in remaining_idx]
 
-        if remaining_sample_size == 0:
-            return top_sampled_ids
-
+    explored_ids = []
+    if explore_k > 0:
         if sample_strategy == "random":
-            # Randomly select from the remaining passages
+            # Randomly sample from the remaining passages
             sampled_idx = np.random.choice(
                 remaining_idx, 
-                size=min(remaining_sample_size, len(remaining_idx)), 
+                size=min(explore_k, len(remaining_idx)), 
                 replace=False
             )
+            explored_ids = [passage_ids[idx] for idx in sampled_idx]
 
         elif sample_strategy == "stratified":
-            strata = np.array_split(remaining_idx, min(remaining_sample_size, len(remaining_idx)))
-            sampled_idx = [np.random.choice(stratum, size=1)[0] for stratum in strata if len(stratum) > 0]
+            # Split into roughly equal strata and sample from each
+            strata = np.array_split(remaining_idx, min(explore_k, len(remaining_idx)))
+            sampled_idx = [
+                np.random.choice(stratum, size=1)[0] 
+                for stratum in strata if len(stratum) > 0
+            ]
+            explored_ids = [passage_ids[idx] for idx in sampled_idx]
+
+        elif sample_strategy in ["city_random", "city_rank"]:
+            remaining_ids = []
+            for city_id, city_passage_ids in passage_dict.items():
+                valid_city_passage_ids = [pid for pid in city_passage_ids if pid in id_to_index]
+                if not valid_city_passage_ids:
+                    continue
+                
+                city_passage_idx = [id_to_index[pid] for pid in valid_city_passage_ids]
+                city_passage_embeddings = passage_embeddings[city_passage_idx]
+
+                if sample_strategy == "city_random":
+                    # Random sampling from each city
+                    explored_ids.extend(
+                        random.sample(valid_city_passage_ids, min(city_max_sample, len(valid_city_passage_ids)))
+                    )
+
+                # elif sample_strategy == "city_rank":
+                #     # Rank passages based on similarity within the city
+                #     city_cosine_similarity = calculate_cosine_similarity(query_embedding, city_passage_embeddings)
+                #     sorted_city_idx = np.argsort(city_cosine_similarity)[::-1][:city_max_sample]
+                #     rexplored_ids.extend([valid_city_passage_ids[idx] for idx in sorted_city_idx])
+
+            # Limit final sample size after city-based sampling
+            if len(explored_ids) > explore_k:
+                remaining_ids = random.sample(remaining_ids, explore_k)
+
+    # Combine exploitation and exploration samples
+    sampled_ids = top_sampled_ids + explored_ids
+
+    # Handle edge cases where not enough data is available
+    if len(sampled_ids) < sample_size:
+        available_ids = list(set(passage_ids) - set(sampled_ids))
+        additional_samples = random.sample(
+            available_ids, 
+            min(sample_size - len(sampled_ids), len(available_ids))
+        )
+        sampled_ids.extend(additional_samples)
+
+    # Shuffle for randomness
+    random.shuffle(sampled_ids)
+
+    return sampled_ids
 
 
-        # Combine top and stratified/random samples
-        remaining_ids = [passage_ids[idx] for idx in sampled_idx]
-        sampled_ids = top_sampled_ids + remaining_ids
-
-        # Shuffle for randomness
-        random.shuffle(sampled_ids)
-        return sampled_ids
-
-    else:
-        sampled_ids = []
-        for city_id, city_passage_ids in passage_dict.items():
-            city_passage_idx = [id_to_index[pid] for pid in city_passage_ids]
-            city_passage_embeddings = passage_embeddings[city_passage_idx]
-            
-            if sample_strategy == "city_random":
-                # Randomly sample from each city's passages
-                sampled_ids.extend(random.sample(city_passage_ids, min(top_k, len(city_passage_ids))))
-            
-            elif sample_strategy == "city_rank":
-                # Rank passages based on city-level similarity
-                city_cosine_similarity = calculate_cosine_similarity(query_embedding, city_passage_embeddings)
-                sorted_city_idx = np.argsort(city_cosine_similarity)[::-1][:top_k]
-                sampled_ids.extend([city_passage_ids[idx] for idx in sorted_city_idx])
-
-        # Rank all selected passages based on overall similarity
-        if len(sampled_ids) > sample_size:
-            sampled_ids_scores = [cosine_similarity_matrix[id_to_index[pid]] for pid in sampled_ids]
-            top_k_idx = np.argsort(sampled_ids_scores)[::-1][:sample_size]
-            sampled_ids = [sampled_ids[idx] for idx in top_k_idx]
-
-        return sampled_ids
 
 def gp_retrieval(
         # Core input data
@@ -118,7 +149,8 @@ def gp_retrieval(
         llm: LLM, 
         kernel: str = "rbf",
         llm_budget: int = 200, 
-        top_k: int = 100,
+        epsilon: float = 0.5,
+        city_max_sample: int = 1,
         sample_strategy: str = "random",
         batch_size: int = 5, 
         cache: dict = None, 
@@ -176,7 +208,8 @@ def gp_retrieval(
         passage_dict=passage_dict,
         sample_strategy=sample_strategy,
         sample_size=llm_budget,
-        top_k=top_k
+        epsilon=epsilon,
+        city_max_sample=city_max_sample
     )
 
     ############### Batch Processing ################

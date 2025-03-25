@@ -10,10 +10,13 @@ import os, json
 from tqdm import tqdm
 
 def main(
+        kernel="rbf",
         llm_budget=200, 
         sample_strategy="random", 
-        top_k=100, 
-        top_k_passages=5, 
+        epsilon=0.5,
+        city_max_sample=1,
+        top_k_passages=5,
+        k_retrieval=1000,
         batch_size=5, 
         fusion_method="sum"
     ):
@@ -46,10 +49,13 @@ def main(
 
     # Centralized configuration
     configs = {
+        "kernel": kernel,
         "llm_budget": llm_budget,
         "sample_strategy": sample_strategy,
-        "top_k_sample": top_k,
+        "epsilon": epsilon,
+        "city_max_sample": city_max_sample,
         "top_k_passages": top_k_passages,
+        "k_retrieval": k_retrieval,
         "batch_size": batch_size,
         "fusion_method": fusion_method
     }
@@ -79,9 +85,11 @@ def main(
             passage_embeddings=passage_embeddings,
             passages=passages,
             passage_dict=passage_dict,
+            kernel=kernel,
             llm=llm,
             llm_budget=llm_budget,
-            top_k=top_k,
+            epsilon=epsilon,
+            city_max_sample=city_max_sample,
             sample_strategy=sample_strategy,
             batch_size=batch_size,
             cache=cache,
@@ -96,6 +104,7 @@ def main(
             passage_dict=passage_dict,
             passage_embeddings=passage_embeddings,
             top_k_passages=top_k_passages,
+            k_retrieval=k_retrieval,
             return_scores=False,
             fusion_method=fusion_method
         )
@@ -144,4 +153,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main(llm_budget=100, sample_strategy="stratified", kernel="rbf", epsilon=0.5)

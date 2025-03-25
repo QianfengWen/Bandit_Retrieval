@@ -1,12 +1,40 @@
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
-from src.utils import random_seed
 import scipy
 import matplotlib.pyplot as plt
 import time
 AQ_FUNCS = ['ucb', 'random', 'greedy']
 
+from sklearn.gaussian_process.kernels import Kernel, NormalizedKernelMixin
+import numpy as np
+
+class CosineSimilarityKernel(NormalizedKernelMixin, Kernel):
+    def __init__(self):
+        pass
+    
+    def __call__(self, X, Y=None, eval_gradient=False):
+        if Y is None:
+            Y = X
+        
+        # Compute cosine similarity
+        X_norm = np.linalg.norm(X, axis=1, keepdims=True)
+        Y_norm = np.linalg.norm(Y, axis=1, keepdims=True)
+        similarity = (X @ Y.T) / (X_norm * Y_norm.T)
+        
+        if eval_gradient:
+            # No gradient available for this kernel
+            return similarity, np.empty((X.shape[0], X.shape[0], 0))
+        return similarity
+    
+    def diag(self, X):
+        return np.ones(X.shape[0])
+
+    def is_stationary(self):
+        return False
+
+
+random_seed = 42   
 class RetrievalGPUCB:
     """
     GP-UCB implementation specifically for retrieval tasks.
@@ -28,16 +56,16 @@ class RetrievalGPUCB:
         # Setup GP regressor with appropriate kernel: 
         # 1. RBF
         if kernel == "rbf":
-            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=2.0, length_scale_bounds=(1e-5, 1e5))
-        # 2. Matern
-        elif kernel == 'matern':
-            kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
-        # 3. Rational Quadratic
-        elif kernel == 'rational_quadratic':
-            kernel = C(1.0) * RationalQuadratic(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
-        # 4. Exponential
-        elif kernel == 'exp_sine_squared':
-            kernel = C(1.0) * ExpSineSquared(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
+            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
+        # # 2. Matern
+        # elif kernel == 'matern':
+        #     kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
+        # # 3. Rational Quadratic
+        # elif kernel == 'rational_quadratic':
+        #     kernel = C(1.0) * RationalQuadratic(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
+        # # 4. Exponential
+        # elif kernel == 'exp_sine_squared':
+        #     kernel = C(1.0) * ExpSineSquared(length_scale=1.0, length_scale_bounds=(1e-4, 1e3))
         # 5. Dot Product
         elif kernel == 'dot_product':
             kernel = C(1.0) * DotProduct()
