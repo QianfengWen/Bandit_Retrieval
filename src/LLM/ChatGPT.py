@@ -63,10 +63,12 @@ class ChatGPT(LLM):
                 assert query_id is not None and passage_ids is not None
                 all_ratings = cache[query_id]
                 target_ratings = [all_ratings[p_id] for p_id in passage_ids]
+                print(f"Cache hit for query {query_id}, using precomputed ratings ...")
+                print(f"Ratings: {target_ratings}")
                 return target_ratings
             
             except KeyError:
-                # print(f"Cache miss for query {query_id}, using LLM ...")
+                print(f"Cache miss for query {query_id}, using LLM ...")
                 pass
 
             except AssertionError:

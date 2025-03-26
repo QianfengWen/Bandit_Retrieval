@@ -1,4 +1,5 @@
 from src.Dataset.travel_dest import TravelDest
+from src.Dataset.point_rec import PointRec
 from src.Retrieval.retrieval import llm_rerank
 from src.Embedding.embedding import handle_embeddings
 from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
@@ -10,23 +11,27 @@ from collections import defaultdict
 def main():
     ################### Load Data ###################
     model_name = "all-MiniLM-L6-v2"
-    dataset_name = "travel_dest"
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    dataset_name = "point_rec"
+    country = "US"
+    if dataset_name != "point_rec":
+        query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
+        passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    else:
+        query_embeddings_path = f"data/{dataset_name}/{country}/{model_name}_query_embeddings.pkl"
+        passage_embeddings_path = f"data/{dataset_name}/{country}/{model_name}_passage_embeddings.pkl"
 
-    dataset = TravelDest()
-    question_ids, queries, passage_ids, passages, relevance_map, passage_to_city, prelabel_relevance = dataset.load_data()
+    dataset = PointRec()
+    question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_city_map, prelabel_relevance = dataset.load_data(country)
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
 
-
-
     ################### Configuration ###################
-    for budget in [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
+    for budget in [50, 100, 200, 300, 400, 500]:
         verbose=False
         k_start = 10
         k_eval = 50
         budget = budget
-        top_k_passages = 5
+        top_k_passages = 1
+        fusion_mode = "sum"
         save_flag = True
     
         configs = {
@@ -34,7 +39,10 @@ def main():
             "top_k_passages": top_k_passages
         }
 
-        result_path = f"{dataset_name}_{model_name}_llm_reranking_results.csv"
+        if dataset_name == "point_rec":
+            result_path = f"{dataset_name}_{country}_{model_name}_llm_reranking_results.csv"
+        else:
+            result_path = f"{dataset_name}_{model_name}_llm_reranking_results.csv"
         
         ################### Evaluation ###################
         prec_k_dict = defaultdict(list)
@@ -46,7 +54,7 @@ def main():
             item, score = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval= budget, cache=prelabel_relevance, return_score=True)
             
             k_start = 10
-            bandit_cities = fusion_score(item, score, passage_to_city, top_k_passages=top_k_passages, return_scores=False, fusion_mode="average")
+            bandit_cities = fusion_score(item, score, passage_city_map, top_k_passages=top_k_passages, return_scores=False, fusion_mode=fusion_mode)
             while k_start <= k_eval:
                 prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[q_id].keys()), k_start, verbose=verbose)
                 prec_k_dict[k_start].append(prec_k)
