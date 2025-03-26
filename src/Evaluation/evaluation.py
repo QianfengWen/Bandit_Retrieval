@@ -63,4 +63,4 @@ def mean_average_precision_k(items, truth, k):
         if item in truth:
             num_correct += 1
             running_sum += num_correct / (i + 1)
-    return running_sum / min(len(truth), k)
+    return running_sum / len(truth)

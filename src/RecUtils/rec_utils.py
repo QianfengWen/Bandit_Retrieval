@@ -42,7 +42,6 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
 
     # sort cities by average score in descending order
     sorted_cities = sorted(city_average_scores.items(), key=lambda x: x[1], reverse=True)
-    print("sorted_cities: ", sorted_cities[:50])
 
     if return_scores:
         return dict(sorted_cities)  # return {city: score} if return_scores=True
