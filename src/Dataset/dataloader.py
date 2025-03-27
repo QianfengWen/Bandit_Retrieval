@@ -3,6 +3,26 @@ import matplotlib.pyplot as plt
 import os
 import json
 
+from src.Dataset.restaurant_phi import RestaurantPhi
+from src.Dataset.restaurant_nor import RestaurantNor
+from src.Dataset.travel_dest import TravelDest
+from src.Dataset.point_rec import PointRec
+
+
+def handle_dataset(dataset_name, country=None):
+    if dataset_name == "restaurant_phi":
+        dataset = RestaurantPhi()
+    elif dataset_name == "restaurant_nor":
+        dataset = RestaurantNor()
+    elif dataset_name == "travel_dest":
+        dataset = TravelDest()
+    elif dataset_name == "point_rec":
+        if not country:
+            dataset = PointRec()
+        else:
+            dataset = PointRec(country)
+    return dataset
+
 class Dataloader(ABC):    
     @abstractmethod
     def load_dataset(self):
@@ -42,4 +62,8 @@ class Dataloader(ABC):
         with open(data_path, 'w') as json_file:
             json.dump(relevance_map, json_file, indent=4)
         return
+    
+
+
+
         

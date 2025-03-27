@@ -5,11 +5,13 @@ import unicodedata
 import pandas as pd
 
 class PointRec:
-    def load_dataset(self, country="US"):
-        self.cache_path = f"data/point_rec/{country}/cache.csv"
+    def __init__(self, country="US"):
+        self.country = country
+    def load_dataset(self):
+        self.cache_path = f"data/point_rec/{self.country}/cache.csv"
 
         # Step 1: Read file names and sort them
-        file_names = sorted(os.listdir(f"data/point_rec/poi_dataset/{country}"))
+        file_names = sorted(os.listdir(f"data/point_rec/poi_dataset/{self.country}"))
 
         # Step 2: Initialize containers
         passages = []
@@ -26,7 +28,7 @@ class PointRec:
             cities.append(city_name)
 
             # Read file content at once for faster I/O
-            with open(f"data/point_rec/poi_dataset/{country}/{file}", "r", encoding='utf-8') as f:
+            with open(f"data/point_rec/poi_dataset/{self.country}/{file}", "r", encoding='utf-8') as f:
                 poi_data = json.load(f)
                 # print(f"For city {city_name}")
                 for poi_id in poi_data.keys():
@@ -45,7 +47,7 @@ class PointRec:
         with open(f"data/point_rec/infoneeds.json", "r", encoding='utf-8') as f:
             query_data = json.load(f)
             for query_id in query_data.keys():
-                if country in query_data[query_id]["Country"] and query_data[query_id]["Description"] not in queries.values():
+                if self.country in query_data[query_id]["Country"] and query_data[query_id]["Description"] not in queries.values():
                     queries[query_id] = query_data[query_id]["Description"]
         
         # Step 5: Load ground truth directly from JSON

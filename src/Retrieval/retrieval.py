@@ -52,8 +52,6 @@ def sample(
     cosine_similarity_matrix = calculate_cosine_similarity(query_embedding, passage_embeddings)
     sorted_idx = np.argsort(cosine_similarity_matrix)[::-1]  # Descending order
     sorted_scores = cosine_similarity_matrix[sorted_idx]
-    print("sorted_idx: ", sorted_idx)
-    print("sorted_scores: ", sorted_scores)
 
     # Step 2: Split based on epsilon (handle boundary cases)
     if epsilon == 0:   # Pure exploitation
@@ -70,9 +68,6 @@ def sample(
     top_sampled_ids = []
     if top_k > 0:
         top_sampled_ids = [passage_ids[idx] for idx in sorted_idx[:top_k]]
-        print("top_k: ", top_k)
-        print("top_scores: ", sorted_scores[:top_k])
-        print("top_sampled_ids: ", top_sampled_ids)
 
     # Exploration step — handle remaining sampling based on strategy
     remaining_idx = sorted_idx[top_k:]
@@ -88,7 +83,6 @@ def sample(
                 replace=False
             )
             explored_ids = [passage_ids[idx] for idx in sampled_idx]
-            print("explored_ids: ", explored_ids)
 
         elif sample_strategy == "stratified":
             # Split into roughly equal strata and sample from each
@@ -243,7 +237,6 @@ def gp_retrieval(
             scores[pid] = score
             observed_ids.append(pid)
             gpucb.update(passage_embeddings[id_to_index[pid]], score)
-        print(f"it takes {time.time() - start} s to update")
 
         # Verbose output for debugging
         if verbose:

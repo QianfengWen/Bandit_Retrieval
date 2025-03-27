@@ -1,5 +1,5 @@
-from src.Dataset.travel_dest import TravelDest
-from src.Dataset.point_rec import PointRec
+from src.Dataset.dataloader import handle_dataset
+
 from src.Retrieval.retrieval import dense_retrieval
 from src.Embedding.embedding import handle_embeddings
 from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
@@ -8,31 +8,25 @@ import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
 import json
-def main():
+def main(dataset_name, top_k_passages=50, k_retrieval=1000, fusion_mode="sum"):
     ################### Load Data ###################
-    model_name = "all-MiniLM-L6-v2"
-    dataset_name = "point_rec"
-    country_name = "US"
-    if dataset_name != "point_rec":
-        query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-        passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-    else:
-        query_embeddings_path = f"data/{dataset_name}/{country_name}/{model_name}_query_embeddings.pkl"
-        passage_embeddings_path = f"data/{dataset_name}/{country_name}/{model_name}_passage_embeddings.pkl"
+    dataset_name = dataset_name
 
-    dataset = PointRec()
-    question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_city_map, prelabel_relevance = dataset.load_data(country=country_name)
-    with open(f'data/{dataset_name}/passages_{country_name}.json', 'w') as f:
-        json.dump(passages, f, indent=4)
+    model_name = "all-MiniLM-L6-v2"
+    dataset = handle_dataset(dataset_name)
+    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
+    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+
+    question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_city_map, prelabel_relevance = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
 
     ################### Configuration ###################
     verbose=False
     k_start_initial = 10
     k_eval = 50
-    k_retrieval = 1000
-    top_k_passages = 1
-    fusion_mode = "sum"
+    k_retrieval = k_retrieval
+    top_k_passages = top_k_passages
+    fusion_mode = fusion_mode
     save_flag = True
     
     configs = {
@@ -40,18 +34,14 @@ def main():
         "top_k_passages": top_k_passages
     }
 
-    if dataset_name != "point_rec":
-        result_path = f"{dataset_name}_{model_name}_baseline_results.csv"
-    else:
-        result_path = f"{dataset_name}_{country_name}_{model_name}_baseline_results.csv"
-    
+    result_path = f"{dataset_name}_{model_name}_baseline_results.csv"
     ################### Evaluation ###################
     prec_k_dict = defaultdict(list)
     rec_k_dict = defaultdict(list)
     map_k_dict = defaultdict(list)
 
+    print("=== Dense Retrieval Demo ===")
     for q_id, query_embedding in tqdm(zip(question_ids, query_embeddings), desc="Query", total=len(question_ids)):
-        print("=== Dense Retrieval Demo ===")
         # print("query_id: ", q_id)
         # print("query_embedding: ", query_embedding.shape)
         # print("passage_embeddings: ", passage_embeddings.shape)
@@ -96,4 +86,6 @@ def main():
         print(f"Results saved to {result_path}")
 
 if __name__ == "__main__":
-    main()
+    for top_k_passages in [1, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]:
+        for k_retrieval in [100, 500, 1000, 2000, 5000, 100000]:
+            main(dataset_name="travel_dest", top_k_passages=top_k_passages)
