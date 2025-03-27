@@ -1,6 +1,7 @@
 from src.Retrieval.retrieval import gp_retrieval
 from src.LLM.ChatGPT import ChatGPT
 from src.Dataset.travel_dest import TravelDest
+from src.Dataset.point_rec import PointRec
 from src.Embedding.embedding import handle_embeddings
 from src.RecUtils.rec_utils import fusion_score_gp, eval_rec, save_results
 
@@ -13,31 +14,40 @@ def main(
         kernel="rbf",
         llm_budget=200, 
         sample_strategy="random", 
-        epsilon=0.5,
+        epsilon=0.1,
         city_max_sample=1,
-        top_k_passages=5,
+        top_k_passages=1,
         k_retrieval=1000,
         batch_size=5, 
         fusion_method="sum"
     ):
     ############## Load Dataset ##############
-    dataset = TravelDest()
-    dataset_name = "travel_dest"
+    dataset = PointRec()
+    dataset_name = "point_rec"
     model_name = "all-MiniLM-L6-v2"
+    country = "US"
 
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    if dataset_name != "point_rec":
+        query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
+        passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    else:
+        query_embeddings_path = f"data/{dataset_name}/{country}/{model_name}_query_embeddings.pkl"
+        passage_embeddings_path = f"data/{dataset_name}/{country}/{model_name}_passage_embeddings.pkl"
 
     # Load data
-    question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_to_city, prelabel_relevance = dataset.load_data()
+    question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_to_city, prelabel_relevance = dataset.load_data(country)
 
     query_embeddings, passage_embeddings = handle_embeddings(
         model_name, query_embeddings_path, passage_embeddings_path, queries, passages
     )
 
     ############## Config ##############
-    cache_path = f"data/{dataset_name}/cache.csv"
-    output_prefix = f"output/{dataset_name}/{model_name}"
+    if dataset_name == "point_rec":
+        cache_path = f"data/{dataset_name}/{country}/cache.csv"
+        output_prefix = f"output/{dataset_name}/{country}/{model_name}"
+    else:
+        cache_path = f"data/{dataset_name}/cache.csv"
+        output_prefix = f"output/{dataset_name}/{model_name}"
 
     os.makedirs(f"{output_prefix}/evaluation_results", exist_ok=True)
     os.makedirs(f"{output_prefix}/retrieval_results", exist_ok=True)
@@ -151,6 +161,5 @@ def main(
         else:
             raise RuntimeError("Failed to save results.")
 
-
 if __name__ == "__main__":
-    main(llm_budget=100, sample_strategy="stratified", kernel="rbf", epsilon=0.5)
+    main()

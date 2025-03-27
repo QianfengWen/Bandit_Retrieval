@@ -3,6 +3,7 @@ from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from collections import defaultdict
 import pandas as pd
 import numpy as np
+import time
 
 def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, return_scores=False, fusion_mode="average"):
     """
@@ -24,9 +25,12 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
 
     # aggregate scores by city
     for pid, score in zip(passage_ids, scores):
+        # print("pid: ", pid, "score: ", score)
         city = passage_city_map.get(pid)
         if city is not None:
             city_scores[city].append(score)
+    
+    # print("city_scores: ", city_scores)
 
     # compute average top-k score for each city
     city_average_scores = {}
@@ -42,7 +46,6 @@ def fusion_score(passage_ids, scores, passage_city_map, top_k_passages=50, retur
 
     # sort cities by average score in descending order
     sorted_cities = sorted(city_average_scores.items(), key=lambda x: x[1], reverse=True)
-
     if return_scores:
         return dict(sorted_cities)  # return {city: score} if return_scores=True
     else:
@@ -81,9 +84,12 @@ def fusion_score_gp(
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
     city_scores = {}
 
+    start = time.time()
     _, scores = gp.get_top_k(passage_embeddings, k_retrieval, return_scores=True)
+    print(f"it takes {time.time() - start} s to finish get topk at line 90")
     top_k_cutoff = scores[-1]
 
+    start = time.time()
     for city_id, city_passage_ids in passage_dict.items():
         # Use list comprehension with direct lookup
         city_passage_idx = [id_to_index[pid] for pid in city_passage_ids]
@@ -106,10 +112,12 @@ def fusion_score_gp(
             city_scores[city_id] = sum(filtered_scores) if filtered_scores else 0
         else:
             raise ValueError("Invalid fusion method: Use 'mean', 'max' or 'sum'.")
+    print(f"it takes {time.time() - start} s to finish getting all city scores")
     # print("city_scores: \n", city_scores)
 
     # Sort cities by score in descending order
     sorted_cities = sorted(city_scores.items(), key=lambda x: x[1], reverse=True)
+    print("sorted_pois: ", sorted_cities[:100])
 
     if return_scores:
         return dict(sorted_cities)
