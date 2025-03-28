@@ -6,21 +6,18 @@ import json
 from src.Dataset.restaurant_phi import RestaurantPhi
 from src.Dataset.restaurant_nor import RestaurantNor
 from src.Dataset.travel_dest import TravelDest
-from src.Dataset.point_rec import PointRec
+from src.Dataset.point_rec_us import PointRecUS
 
 
-def handle_dataset(dataset_name, country=None):
+def handle_dataset(dataset_name):
     if dataset_name == "restaurant_phi":
         dataset = RestaurantPhi()
     elif dataset_name == "restaurant_nor":
         dataset = RestaurantNor()
     elif dataset_name == "travel_dest":
         dataset = TravelDest()
-    elif dataset_name == "point_rec":
-        if not country:
-            dataset = PointRec()
-        else:
-            dataset = PointRec(country)
+    elif dataset_name == "point_rec_us":
+        dataset = PointRecUS()
     return dataset
 
 class Dataloader(ABC):    
