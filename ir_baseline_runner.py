@@ -1,11 +1,11 @@
 import argparse
 
-from Dataset.dataloader import handle_dataset
-from Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
+from src.Dataset.dataloader import handle_dataset
+from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
 
-from Retrieval.retrieval import dense_retrieval
-from Embedding.embedding import handle_embeddings
-from RecUtils.rec_utils import save_results
+from src.Retrieval.retrieval import dense_retrieval
+from src.Embedding.embedding import handle_embeddings
+from src.RecUtils.rec_utils import save_results
 
 import numpy as np
 from tqdm import tqdm
@@ -13,7 +13,6 @@ from collections import defaultdict
 
 def main(dataset_name, model_name, save_flag=True):
     ################### Load Data ###################
-    dataset_name = dataset_name
 
     dataset = handle_dataset(dataset_name)
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"

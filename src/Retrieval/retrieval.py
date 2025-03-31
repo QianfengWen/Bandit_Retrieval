@@ -153,7 +153,7 @@ def gp_retrieval(
         sample_strategy: str = "random",
         batch_size: int = 5, 
         cache: dict = None, 
-        update_cache = None,
+        update_cache:str = None,
         verbose: bool = False
     ):
     """
@@ -267,7 +267,7 @@ def bandit_retrieval(
         verbose: bool=False, 
         return_score: bool=False, 
         cache: dict=None, 
-        update_cache: str=None
+        update_cache: bool=None
     ):
     """
     Bandit retrieval using GP-UCB, based on embeddings of passages.
@@ -309,8 +309,9 @@ def bandit_retrieval(
         cold_start_ids = [passage_ids[idx] for idx in cold_start_idx]
 
         random.shuffle(cold_start_ids)
-        print("there are ", len(cold_start_ids), " cold start ids")
-        print("cold start ids: ", cold_start_ids)
+        if verbose:
+            print("There are ", len(cold_start_ids), " cold start ids")
+            print("Cold start ids: ", cold_start_ids)
         cold_start_batches = [cold_start_ids[i:i + batch_size] for i in range(0, len(cold_start_ids), batch_size)]
         
         for batch in cold_start_batches:
@@ -346,16 +347,17 @@ def bandit_retrieval(
     num_iterations = (llm_budget - k_cold_start) // batch_size 
 
     # use GP-UCB to select passages in batches
-    for _ in tqdm(range(num_iterations), desc="Bandit Retrieval"):
+    for _ in tqdm(range(num_iterations), desc="Bandit Retrieval", disable=not verbose):
         if not available_ids:
             break  
 
         available_embeddings = [id_to_embedding[pid] for pid in available_ids]
-        print("there are ", len(available_ids), " available embeddings")
         
         next_embedding_idxs = gpucb.select(available_embeddings, batch_size) 
-        next_ids = [available_ids[idx] for idx in next_embedding_idxs] 
-        print("Next IDs: ", next_ids)
+        next_ids = [available_ids[idx] for idx in next_embedding_idxs]
+        if verbose:
+            print("there are ", len(available_ids), " available embeddings")
+            print("Next IDs: ", next_ids)
 
         for next_id in next_ids:
             available_ids.remove(next_id)

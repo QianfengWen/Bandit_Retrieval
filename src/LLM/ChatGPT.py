@@ -44,9 +44,9 @@ class ChatGPT(LLM):
             query: str, 
             passages: list[str], 
             query_id: int = None, 
-            passage_ids: list[int] = None, 
-            cache: str = None, 
-            update_cache: bool = False
+            passage_ids: list[int] = None,
+            cache: dict = None,
+            update_cache: str = None,
         ) -> list[float]:
         """
         Get the relevance score of each passage for a given query using a single LLM call.
@@ -54,6 +54,10 @@ class ChatGPT(LLM):
         Args:
             query: The query text.
             passages: A list of passage texts.
+            query_id: The ID of the query.
+            passage_ids: A list of IDs for the passages.
+            cache: A dictionary of cached results.
+            update_cache: Path to the CSV file to update with new results. If provided, the results will be written to the CSV file.
         
         Returns:
             A list of relevance scores between 0 and 1.

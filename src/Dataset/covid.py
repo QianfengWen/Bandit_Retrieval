@@ -1,12 +1,15 @@
 from collections import defaultdict
 
 import ir_datasets
+import pandas as pd
 
 
 class Covid():
-    def __init__(self):
+    def __init__(self, cache_path="data/covid/cache.csv"):
+        self.dataset = None
         self.question_sub = None
         self.passage_sub = None
+        self.cache_path = cache_path
 
         self.relevance_threshold = 2
 
@@ -48,6 +51,7 @@ class Covid():
 
     def create_relevance_map(self):
         relevance_map = defaultdict(dict)
+
         for qrel in self.dataset.qrels_iter():
             query_id = qrel.query_id
             doc_id = qrel.doc_id
@@ -61,6 +65,19 @@ class Covid():
             relevance_map[query_id][doc_id] = relevance
 
         return relevance_map
+
+    def load_cache(self):
+        try:
+            df = pd.read_csv(self.cache_path, skipinitialspace=True)
+            prelabel_relevance = defaultdict(dict)
+
+            # Efficient row-wise mapping using zip
+            for query_id, doc_id, score in zip(df['query_id'], df['passage_id'], df['score']):
+                prelabel_relevance[int(query_id)][int(doc_id)] = float(score)
+
+            return prelabel_relevance
+        except:
+            return defaultdict(dict)
 
     def load_data(self):
         self.dataset = self.load_dataset()
