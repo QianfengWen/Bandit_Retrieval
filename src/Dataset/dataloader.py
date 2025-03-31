@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import json
 
+from src.Dataset.covid import Covid
 from src.Dataset.restaurant_phi import RestaurantPhi
 from src.Dataset.restaurant_nor import RestaurantNor
 from src.Dataset.travel_dest import TravelDest
@@ -18,6 +19,10 @@ def handle_dataset(dataset_name):
         dataset = TravelDest()
     elif dataset_name == "point_rec_us":
         dataset = PointRecUS()
+    elif dataset_name == "covid":
+        dataset = Covid()
+    else:
+        raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset
 
 class Dataloader(ABC):    

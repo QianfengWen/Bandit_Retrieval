@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 def evaluate(question_ids: list, passage_ids: list, retrieval_results: np.array, relevance_map: dict, evaluation_func: callable, k: int):
     """
@@ -64,3 +65,30 @@ def mean_average_precision_k(items, truth, k):
             num_correct += 1
             running_sum += num_correct / (i + 1)
     return running_sum / len(truth)
+
+def normalized_dcg_k(items, truth, k):
+    """
+    Compute normalized discounted cumulative gain@k
+    :param items: list of retrieved items
+    :param truth: list of ground truth items
+    :param k: number of top items to consider
+    :return: normalized discounted cumulative gain@k
+    """
+
+    def dcg(recommended, relevant, k):
+        dcg_val = 0.0
+        for i, item in enumerate(recommended[:k]):
+            if item in relevant:
+                dcg_val += 1 / math.log2(i + 2)
+        return dcg_val
+
+    def idcg(relevant, k):
+        ideal_hits = min(len(relevant), k)
+        return sum(1 / math.log2(i + 2) for i in range(ideal_hits))
+
+    actual_dcg = dcg(items, truth, k)
+    ideal_dcg = idcg(truth, k)
+
+    if ideal_dcg == 0:
+        return 0.0
+    return actual_dcg / ideal_dcg

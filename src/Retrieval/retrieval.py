@@ -405,7 +405,7 @@ def dense_retrieval(
     if return_score:
         top_k_scores = [cosine_similairty_matrix[idx] for idx in top_k_idx]
         return top_k_ids, top_k_scores
-    return top_k_ids
+    return top_k_ids, None
 
 
 def llm_rerank(
