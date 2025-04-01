@@ -32,6 +32,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         print(f"Queries: {queries}")
         llm_budget = 10
         k_cold_start = 5
+        verbose = True
     else:
         verbose = False
 
@@ -43,6 +44,9 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
     gpucb_percentage = (llm_budget - k_cold_start) / llm_budget
 
+    if acq_func == "greedy":
+        print(f"For greedy, set k_cold_start to {llm_budget}")
+        k_cold_start = llm_budget
     configs = {
         "dataset_name": dataset_name,
         "model_name": model_name,
@@ -121,7 +125,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
-    parser.add_argument('--acq_func', type=str, default='ucb', help='acquisition function for bandit')
+    parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'random', 'greedy'])
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')

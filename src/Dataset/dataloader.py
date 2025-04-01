@@ -6,6 +6,7 @@ import json
 from src.Dataset.covid import Covid
 from src.Dataset.restaurant_phi import RestaurantPhi
 from src.Dataset.restaurant_nor import RestaurantNor
+from src.Dataset.touche import Touche
 from src.Dataset.travel_dest import TravelDest
 from src.Dataset.point_rec_us import PointRecUS
 
@@ -21,6 +22,8 @@ def handle_dataset(dataset_name):
         dataset = PointRecUS()
     elif dataset_name == "covid":
         dataset = Covid()
+    elif dataset_name == "touche":
+        dataset = Touche()
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset

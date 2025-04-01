@@ -4,13 +4,25 @@ import torch
 import os
 from sentence_transformers import SentenceTransformer
 
-def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path):
-    embedder = SentenceTransformer(model_name)
+def add_eos(input_examples, model):
+  input_examples = [input_example + model.tokenizer.eos_token for input_example in input_examples]
+  return input_examples
+
+def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size=32):
+    print(model_name)
+    embedder = SentenceTransformer(model_name, trust_remote_code=True)
+    embedder.max_seq_length = min(1024, embedder.max_seq_length)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     embedder.to(device)
 
-    query_embeddings = embedder.encode(query_texts, convert_to_tensor=False, show_progress_bar=True)
-    passages_embeddings = embedder.encode(passage_texts, convert_to_tensor=False, show_progress_bar=True)
+    if "Qwen2" in model_name:
+        query_prompt = "query"
+    else:
+        query_prompt = None
+    print("Encoding queries..")
+    query_embeddings = embedder.encode(query_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size, prompt=query_prompt)
+    print("Encoding passages..")
+    passages_embeddings = embedder.encode(passage_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size)
 
     save_embeddings(query_embeddings, passages_embeddings, query_embeddings_path, passage_embeddings_path)
    
@@ -39,10 +51,10 @@ def load_embeddings(query_embeddings_path, passage_embeddings_path):
         assert isinstance(passage_embeddings, np.ndarray), "passage_embeddings should be a numpy array"
     return query_embeddings, passage_embeddings
 
-def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts):
+def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts, batch_size=32):
     if model_name and os.path.exists(query_embeddings_path) and os.path.exists(passage_embeddings_path):
         print(f"Loading embeddings from {query_embeddings_path} and {passage_embeddings_path}")
         return load_embeddings(query_embeddings_path, passage_embeddings_path)
     else:
         print(f"Creating embeddings for {model_name}")
-        return create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path)
+        return create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size)
