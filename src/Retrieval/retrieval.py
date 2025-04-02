@@ -425,21 +425,17 @@ def llm_rerank(
     passage_ids, dense_score = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval=k_retrieval, return_score=True)
     dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
     if cache:
-        try:
-            valid_cached_items = {
-                pid: score for pid, score in cache[query_id].items() if pid in passage_ids
-            }
-            
-            sorted_item = sorted(valid_cached_items.items(), key=lambda x: (x[1], dense_score_dict[x[0]]), reverse=True)[:k_retrieval]            
-            sorted_passages = [int(key) for key, _ in sorted_item]
-            if return_score:
-                sorted_scores = [value for _, value in sorted_item]
-                return sorted_passages, sorted_scores
-            return sorted_passages
-        
-        except:
-            pass
-        
+        valid_cached_items = {
+            pid: score for pid, score in cache[query_id].items() if pid in passage_ids
+        }
+
+        sorted_item = sorted(valid_cached_items.items(), key=lambda x: (x[1], dense_score_dict[x[0]]), reverse=True)[:k_retrieval]
+        sorted_passages = [key for key, _ in sorted_item]
+        if return_score:
+            sorted_scores = [value for _, value in sorted_item]
+            return sorted_passages, sorted_scores
+        return sorted_passages
+
     print(f"Cache miss for query {query_id}, using LLM ...")
     print("Please run llm_baseline_runner.py to generate LLM scores for the query")
     

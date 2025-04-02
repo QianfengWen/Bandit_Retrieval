@@ -17,8 +17,8 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     ################### Load Data ###################
 
     dataset = handle_dataset(dataset_name)
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    query_embeddings_path = f"src/data/{dataset_name}/{model_name}_query_embeddings.pkl"
+    passage_embeddings_path = f"src/data/{dataset_name}/{model_name}_passage_embeddings.pkl"
 
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
@@ -130,7 +130,7 @@ def arg_parser():
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
-    parser.add_argument('--batch_size', type=int, default=5, help='batch size for bandit')
+    parser.add_argument('--batch_size', type=int, default=1, help='batch size for bandit')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 5, 10])

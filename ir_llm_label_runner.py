@@ -13,6 +13,7 @@ from tqdm import tqdm
 from collections import defaultdict
 
 def main(dataset_name, model_name, top_k):
+    verbose = False
     ################### Load Data ###################
 
     dataset = handle_dataset(dataset_name)
@@ -34,7 +35,7 @@ def main(dataset_name, model_name, top_k):
         total +=  top_k
         hit += (top_k - len(sorted_passages))
 
-        for p_id, passage in tqdm(sorted_passages, total=len(sorted_passages)):
+        for p_id, passage in tqdm(sorted_passages, total=len(sorted_passages), disable=not verbose):
             if p_id in cache[q_id]:
                 continue
             scores = llm.get_score(query, [passage], query_id=q_id, passage_ids=[p_id], cache=cache, update_cache=dataset.cache_path)

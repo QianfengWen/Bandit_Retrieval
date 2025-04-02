@@ -3,7 +3,7 @@ import argparse
 from src.Dataset.dataloader import handle_dataset
 from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
 
-from src.Retrieval.retrieval import dense_retrieval
+from src.Retrieval.retrieval import dense_retrieval, llm_rerank
 from src.Embedding.embedding import handle_embeddings
 from src.RecUtils.rec_utils import save_results
 
@@ -11,7 +11,7 @@ import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
 
-def main(dataset_name, model_name, save_flag=True):
+def main(dataset_name, model_name, top_k_passages, save_flag=True):
     ################### Load Data ###################
 
     dataset = handle_dataset(dataset_name)
@@ -21,24 +21,26 @@ def main(dataset_name, model_name, save_flag=True):
     question_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
 
+    cache = dataset.load_cache()
     ################### Configuration ###################
 
     configs = {
         "dataset_name": dataset_name,
         "model_name": model_name,
+        "top_k_passages": top_k_passages,
     }
 
-    result_path = f"ir_{dataset_name}_{model_name}_baseline_results.csv"
+    result_path = f"ir_{dataset_name}_{model_name}_llm_result_100.csv"
     ################### Evaluation ###################
-    k_retrieval = max(args.cutoff)
+    k_retrieval = top_k_passages
     ndcg_k_dict = defaultdict(list)
     prec_k_dict = defaultdict(list)
     rec_k_dict = defaultdict(list)
     map_k_dict = defaultdict(list)
 
-    print("=== Dense Retrieval Demo ===")
-    for q_id, query_embedding in tqdm(zip(question_ids, query_embeddings), desc="Query", total=len(question_ids)):
-        items, scores = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval = k_retrieval, return_score=True)
+    print("=== LLM Reranking ===")
+    for q_id, query_embedding in tqdm(zip(question_ids, query_embeddings), desc="Reranking", total=len(question_ids)):
+        items = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval=k_retrieval, cache=cache, return_score=False)
         gt = set([p_id for p_id, relevance in relevance_map[q_id].items() if relevance >= dataset.relevance_threshold])
 
         for k_start in args.cutoff:
@@ -52,7 +54,7 @@ def main(dataset_name, model_name, save_flag=True):
             map_k_dict[k_start].append(map_k)
             ndcg_k_dict[k_start].append(ndcg_k)
 
-    print(f"=== Baseline Demo for {model_name}===")
+    print(f"=== LLM reranking Demo for {model_name}===")
 
     results = {}
     for k in prec_k_dict.keys():
@@ -81,4 +83,4 @@ def arg_parser():
 
 if __name__ == "__main__":
     args = arg_parser()
-    main(dataset_name=args.dataset_name, model_name=args.emb_model)
+    main(dataset_name=args.dataset_name, model_name=args.emb_model, top_k_passages=100)
