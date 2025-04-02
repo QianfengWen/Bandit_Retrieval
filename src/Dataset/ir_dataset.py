@@ -1,3 +1,4 @@
+import os
 from abc import ABC
 from collections import defaultdict
 
@@ -10,6 +11,7 @@ class IRDataset(ABC):
         self.dataset = None
         self.question_sub = None
         self.passage_sub = None
+
         self.data_name = data_name
         self.cache_path = cache_path
 
@@ -69,16 +71,17 @@ class IRDataset(ABC):
         return relevance_map
 
     def load_cache(self):
-        try:
+        if os.path.exists(self.cache_path):
             df = pd.read_csv(self.cache_path, skipinitialspace=True)
             prelabel_relevance = defaultdict(dict)
 
             # Efficient row-wise mapping using zip
             for query_id, doc_id, score in zip(df['query_id'], df['passage_id'], df['score']):
-                prelabel_relevance[int(query_id)][int(doc_id)] = float(score)
+                prelabel_relevance[str(query_id)][doc_id] = float(score)
 
             return prelabel_relevance
-        except:
+        else:
+            print(f"Cache file {self.cache_path} not found. Creating new cache file.")
             return defaultdict(dict)
 
     def load_data(self):
