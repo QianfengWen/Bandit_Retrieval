@@ -1,3 +1,5 @@
+import os
+
 from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k
 from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from collections import defaultdict
@@ -175,28 +177,25 @@ def save_results(configs, results, file_path):
         bool: True if save was successful, False otherwise.
 
     """
-    try:
-        # Create a single row DataFrame from configs
-        df_new = pd.DataFrame([configs])
-        
-        # Add results to the same row
-        for metric, value in results.items():
-            df_new[metric] = value
-            
-        # If file exists, append; otherwise create new file
-        try:
-            df_existing = pd.read_csv(file_path)
-            # check if the columns are the same
-            if set(df_existing.columns) != set(df_new.columns):
-                raise ValueError("Columns do not match")
-            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-        except FileNotFoundError:
-            df_combined = df_new
-            
-        # Save to CSV
-        df_combined.to_csv(file_path, index=False)
-        return True
-        
-    except Exception as e:
-        print(f"Error saving results: {str(e)}")
-        return False
+
+    # Create a single row DataFrame from configs
+    df_new = pd.DataFrame([configs])
+
+    # Add results to the same row
+    for metric, value in results.items():
+        df_new[metric] = value
+
+    # If file exists, append; otherwise create new file
+    if os.path.exists(file_path):
+        df_existing = pd.read_csv(file_path)
+        # check if the columns are the same
+        if set(df_existing.columns) != set(df_new.columns):
+            raise ValueError("Columns do not match")
+        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+    else:
+        df_combined = df_new
+
+    # Save to CSV
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    df_combined.to_csv(file_path, index=False)
+    return True

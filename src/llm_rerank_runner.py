@@ -12,8 +12,8 @@ def main(dataset_name, budget=50, top_k_passages=5, fusion_mode="sum"):
     dataset_name = dataset_name
     model_name = "all-MiniLM-L6-v2"
     dataset = handle_dataset(dataset_name)
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    query_embeddings_path = f"../data/{dataset_name}/{model_name}_query_embeddings.pkl"
+    passage_embeddings_path = f"../data/{dataset_name}/{model_name}_passage_embeddings.pkl"
 
      
     question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_city_map, prelabel_relevance = dataset.load_data()

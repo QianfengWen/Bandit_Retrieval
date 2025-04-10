@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 from src.Dataset.dataloader import handle_dataset
@@ -11,15 +12,23 @@ from src.RecUtils.rec_utils import save_results
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
+import wandb
 
 def main(dataset_name, model_name, top_k):
     verbose = False
     ################### Load Data ###################
 
-    dataset = handle_dataset(dataset_name)
-    query_embeddings_path = f"src/data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"src/data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    base_path = os.path.dirname(os.path.abspath(__file__))
 
+    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
+    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    cache_path = f"data/{dataset_name}/cache.csv"
+
+    query_embeddings_path = os.path.join(base_path, query_embeddings_path)
+    passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
+    cache_path = os.path.join(base_path, cache_path)
+
+    dataset = handle_dataset(dataset_name, cache_path)
     question_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
     cache = dataset.load_cache()
@@ -42,6 +51,7 @@ def main(dataset_name, model_name, top_k):
             rating_results[q_id][p_id] = scores[0]
 
     print(f"Total: {total}, Hit: {hit}, Hit rate: {hit/total:.4f}")
+    json.dump(rating_results, open(f"data/{dataset_name}/{model_name}_llm_label_results.json", "w"))
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')

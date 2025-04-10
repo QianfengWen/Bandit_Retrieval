@@ -12,17 +12,30 @@ from src.LLM.ChatGPT import ChatGPT
 from src.RecUtils.rec_utils import save_results
 from src.Retrieval.retrieval import bandit_retrieval
 
+import wandb
 
-def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, batch_size, save_flag=True):
+MODE="bandit"
+
+def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, batch_size, args, save_flag=True):
     ################### Load Data ###################
+    base_path = os.path.dirname(os.path.abspath(__file__))
 
-    dataset = handle_dataset(dataset_name)
-    query_embeddings_path = f"src/data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"src/data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
+    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    cache_path = f"data/{dataset_name}/cache.csv"
+    result_path = f"results/{dataset_name}/{model_name}_{MODE}_results.csv"
 
+    query_embeddings_path = os.path.join(base_path, query_embeddings_path)
+    passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
+    cache_path = os.path.join(base_path, cache_path)
+    result_path = os.path.join(base_path, result_path)
+
+    dataset = handle_dataset(dataset_name, cache_path)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages)
+    cache = dataset.load_cache()
+    print(cache)
 
     if args.debug:
         print("DEBUG MODE")
@@ -37,10 +50,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         verbose = False
 
     ################### Configuration ###################
-    output_prefix = f"data/{dataset_name}/{model_name}_bandit"
-    result_path = f"{output_prefix}_results.csv"
     k_retrieval = max(args.cutoff)
-    cache = dataset.load_cache()
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
     gpucb_percentage = (llm_budget - k_cold_start) / llm_budget
 
@@ -48,6 +58,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         print(f"For greedy, set k_cold_start to {llm_budget}")
         k_cold_start = llm_budget
     configs = {
+        "runner": MODE,
         "dataset_name": dataset_name,
         "model_name": model_name,
         "k_retrieval": k_retrieval,
@@ -57,12 +68,22 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         "beta": beta,
         "kernel": kernel,
         "acq_func": acq_func,
-        "gpubc_percentage": gpucb_percentage,
+        "ucb_percentage": gpucb_percentage,
         "batch_size": args.batch_size,
     }
 
     for k, v in configs.items():
         print(f"{k}: {v}")
+
+    if not args.wandb_disable:
+        run = wandb.init(
+            project="bandit",
+            config=configs,
+            group=args.wandb_group,
+        )
+    else:
+        run = None
+
     ################### Evaluation ###################
     ndcg_k_dict = defaultdict(list)
     prec_k_dict = defaultdict(list)
@@ -112,10 +133,17 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
         print(f"NDCG@{k}: {np.mean(ndcg_k_dict[k])}\n")
 
-        results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
-        results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
-        results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
-        results[f"ndcg@{k}"] = np.mean(ndcg_k_dict[k]).round(4)
+        results[f"precision@{k}"] = np.mean(prec_k_dict[k])
+        results[f"recall@{k}"] = np.mean(rec_k_dict[k])
+        results[f"map@{k}"] = np.mean(map_k_dict[k])
+        results[f"ndcg@{k}"] = np.mean(ndcg_k_dict[k])
+
+    if run is not None:
+        updated_dict = {}
+        for k, v in results.items():
+            new_key = str(k).replace("@", "/")
+            updated_dict[new_key] = v
+        wandb.log(updated_dict)
 
     if save_flag:
         assert save_results(configs, results, result_path) == True, "Results not saved"
@@ -133,7 +161,10 @@ def arg_parser():
     parser.add_argument('--batch_size', type=int, default=1, help='batch size for bandit')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
-    parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 5, 10])
+    parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
+
+    parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
+    parser.add_argument("--wandb_group", type=str, default=None, help="wandb group")
 
     parser.add_argument("--debug", action="store_true", help="debug mode")
     args = parser.parse_args()
@@ -143,4 +174,4 @@ def arg_parser():
 if __name__ == "__main__":
     args = arg_parser()
     main(dataset_name=args.dataset_name, model_name=args.emb_model, acq_func=args.acq_func, beta=args.beta,
-         llm_budget=args.llm_budget, k_cold_start=args.cold_start, kernel=args.kernel, batch_size=args.batch_size)
+         llm_budget=args.llm_budget, k_cold_start=args.cold_start, kernel=args.kernel, batch_size=args.batch_size, args=args)

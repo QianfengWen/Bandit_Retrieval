@@ -71,6 +71,7 @@ class IRDataset(ABC):
         return relevance_map
 
     def load_cache(self):
+        print(f"Loading cache file {self.cache_path}")
         if os.path.exists(self.cache_path):
             df = pd.read_csv(self.cache_path, skipinitialspace=True)
             prelabel_relevance = defaultdict(dict)

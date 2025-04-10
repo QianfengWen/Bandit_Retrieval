@@ -27,9 +27,9 @@ def main():
     batch_size = 1
     num = 1000
 
-    output_path = "data/travel_dest/cache.csv"
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
+    output_path = "../data/travel_dest/cache.csv"
+    query_embeddings_path = f"../data/{dataset_name}/{model_name}_query_embeddings.pkl"
+    passage_embeddings_path = f"../data/{dataset_name}/{model_name}_passage_embeddings.pkl"
 
 
     # Load dataset

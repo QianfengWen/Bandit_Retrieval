@@ -52,9 +52,11 @@ def load_embeddings(query_embeddings_path, passage_embeddings_path):
     return query_embeddings, passage_embeddings
 
 def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts, batch_size=32):
+
     if model_name and os.path.exists(query_embeddings_path) and os.path.exists(passage_embeddings_path):
-        print(f"Loading embeddings from {query_embeddings_path} and {passage_embeddings_path}")
+        print("The embeddings already exist.")
         return load_embeddings(query_embeddings_path, passage_embeddings_path)
     else:
+        print("The embeddings do not exist.")
         print(f"Creating embeddings for {model_name}")
         return create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size)
