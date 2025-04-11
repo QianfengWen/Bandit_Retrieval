@@ -9,7 +9,20 @@ import time
 SAMPLE_STRATEGIES = ["random", "stratified", "city_random", "city_rank"]
 
 def calculate_cosine_similarity(query_embeddings, passage_embeddings):
-    return np.dot(query_embeddings, passage_embeddings.T)
+    dot_product = np.dot(query_embeddings, passage_embeddings.T)
+    return dot_product
+
+def calculate_cosine_similarity(query_embeddings, passage_embeddings):
+    if query_embeddings.ndim == 1:
+        query_embeddings = query_embeddings.reshape(1, -1)
+
+    # Normalize embeddings
+    query_norm = query_embeddings / np.linalg.norm(query_embeddings, axis=1, keepdims=True)
+    passage_norm = passage_embeddings / np.linalg.norm(passage_embeddings, axis=1, keepdims=True)
+
+    # Compute cosine similarity
+    similarity_matrix = np.dot(query_norm, passage_norm.T)
+    return similarity_matrix.flatten()
 
 def sample(
         query_embedding, 
@@ -37,7 +50,6 @@ def sample(
     Returns:
         list: List of sampled passage IDs.
     """
-
     if sample_strategy not in SAMPLE_STRATEGIES:
         raise ValueError(f"Invalid sample strategy. Choose from: {SAMPLE_STRATEGIES}")
 
@@ -186,14 +198,13 @@ def gp_retrieval(
     """
 
     ############### Set Up ################
-    if llm_budget < 1:
-        raise ValueError("LLM budget must be at least 1")
-
     # Fast lookup for embeddings
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
 
     # Initialize GP-UCB model
     gpucb = GaussianProcess(kernel=kernel)
+
+    gpucb.update(query_embedding, 3.0)
 
     # To store observed scores
     scores = {}
@@ -206,7 +217,7 @@ def gp_retrieval(
         passage_embeddings=passage_embeddings,
         passage_dict=passage_dict,
         sample_strategy=sample_strategy,
-        sample_size=llm_budget,
+        sample_size=llm_budget - 1,
         epsilon=epsilon,
         city_max_sample=city_max_sample
     )
@@ -250,19 +261,19 @@ def gp_retrieval(
     return gpucb
 
 def bandit_retrieval(
+        query: str, 
+        query_embedding: np.array, 
+        query_id: int,
         passage_ids: list, 
-        passage_embeddings: list, 
+        passage_embeddings: np.array, 
         passages: list, 
         llm: LLM, 
-        query, 
-        query_embedding, 
-        query_id, 
-        beta=2.0, 
+        kernel: str = "rbf",
         acq_func="ucb",
-        llm_budget: int=10, 
         k_cold_start: int=5, 
         k_retrieval: int=1000,
-        kernel: str="rbf", 
+        beta=2.0, 
+        llm_budget: int=10, 
         batch_size: int=10, 
         verbose: bool=False, 
         return_score: bool=False, 
@@ -309,8 +320,6 @@ def bandit_retrieval(
         cold_start_ids = [passage_ids[idx] for idx in cold_start_idx]
 
         random.shuffle(cold_start_ids)
-        print("there are ", len(cold_start_ids), " cold start ids")
-        print("cold start ids: ", cold_start_ids)
         cold_start_batches = [cold_start_ids[i:i + batch_size] for i in range(0, len(cold_start_ids), batch_size)]
         
         for batch in cold_start_batches:
@@ -351,11 +360,9 @@ def bandit_retrieval(
             break  
 
         available_embeddings = [id_to_embedding[pid] for pid in available_ids]
-        print("there are ", len(available_ids), " available embeddings")
         
         next_embedding_idxs = gpucb.select(available_embeddings, batch_size) 
         next_ids = [available_ids[idx] for idx in next_embedding_idxs] 
-        print("Next IDs: ", next_ids)
 
         for next_id in next_ids:
             available_ids.remove(next_id)
@@ -418,27 +425,52 @@ def llm_rerank(
         cache: dict=None    
     ):
     """
-    rerank using LLM
+    rerank using LLM; append dense results beyond k_retrieval without reranking
     """
-    passage_ids, dense_score = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval=k_retrieval, return_score=True)
+    # Step 1: Retrieve top N (>= k_retrieval) with dense retrieval
+    passage_ids, dense_score = dense_retrieval(
+        passage_ids, passage_embeddings, query_embedding, 
+        k_retrieval=max(k_retrieval * 2, len(passage_ids)), return_score=True
+    )
+    
+    # Build dense score dict for all
     dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
+    
+    # Separate top-k for reranking and rest
+    top_k_passages = passage_ids[:k_retrieval]
+    rest_passages = passage_ids[k_retrieval:]
+
     if cache:
         try:
             valid_cached_items = {
-                pid: score for pid, score in cache[query_id].items() if pid in passage_ids
+                pid: score for pid, score in cache[query_id].items() if pid in top_k_passages
             }
+            # Use dense_score_dict as tiebreaker
+            sorted_item = sorted(
+                valid_cached_items.items(), 
+                key=lambda x: (x[1], dense_score_dict[x[0]]), 
+                reverse=True
+            )
+            reranked_passages = [int(pid) for pid, _ in sorted_item]
+            reranked_scores = [score for _, score in sorted_item]
             
-            sorted_item = sorted(valid_cached_items.items(), key=lambda x: (x[1], dense_score_dict[x[0]]), reverse=True)[:k_retrieval]            
-            sorted_passages = [int(key) for key, _ in sorted_item]
+            # Fill in any missing top-k passages not found in cache
+            remaining_in_top_k = [pid for pid in top_k_passages if pid not in valid_cached_items]
+            reranked_passages += remaining_in_top_k
+            reranked_scores += [dense_score_dict[pid] for pid in remaining_in_top_k]
+
+            # Append the rest of the dense results
+            final_passages = reranked_passages + rest_passages
             if return_score:
-                sorted_scores = [value for _, value in sorted_item]
-                return sorted_passages, sorted_scores
-            return sorted_passages
-        
+                final_scores = reranked_scores + [dense_score_dict[pid] for pid in rest_passages]
+                return final_passages, final_scores
+            return final_passages
         except:
             pass
-        
+
     print(f"Cache miss for query {query_id}, using LLM ...")
     print("Please run llm_baseline_runner.py to generate LLM scores for the query")
+    return passage_ids[:k_retrieval]  # fallback
+
     
     
