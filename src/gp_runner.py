@@ -56,7 +56,7 @@ def main(
         "epsilon": epsilon,
         "city_max_sample": city_max_sample,
         "top_k_passages": top_k_passages,
-        "k_retrieval": k_retrieval,
+        "k_retrieval": len(passage_ids),
         "batch_size": batch_size,
         "fusion_method": fusion_method
     }
@@ -105,7 +105,7 @@ def main(
             passage_dict=passage_dict,
             passage_embeddings=passage_embeddings,
             top_k_passages=top_k_passages,
-            k_retrieval=k_retrieval,
+            k_retrieval=len(passage_ids),
             return_scores=False,
             fusion_method=fusion_method
         )
@@ -153,4 +153,4 @@ def main(
             raise RuntimeError("Failed to save results.")
 
 if __name__ == "__main__":
-    main(dataset_name="point_rec_us", llm_budget=50, sample_strategy="random", kernel="rbf", epsilon=0)
+    main(dataset_name="travel_dest", llm_budget=25, sample_strategy="random", kernel="rbf", epsilon=0, top_k_passages=3)
