@@ -19,7 +19,8 @@ def main(
         top_k_passages=1,
         k_retrieval=1000,
         batch_size=5, 
-        fusion_method="sum"
+        fusion_method="sum",
+        random_seed=42,
     ):
     ############## Load Dataset ##############
     dataset_name = dataset_name
@@ -58,7 +59,8 @@ def main(
         "top_k_passages": top_k_passages,
         "k_retrieval": len(passage_ids),
         "batch_size": batch_size,
-        "fusion_method": fusion_method
+        "fusion_method": fusion_method,
+        "random_seed": random_seed,
     }
 
     # Automatically generate file names based on config values
@@ -95,7 +97,8 @@ def main(
             batch_size=batch_size,
             cache=cache,
             update_cache=update_cache,
-            verbose=False
+            verbose=False,
+            random_seed=random_seed
         )
 
         # Fusion of Passage Scores into City Scores
