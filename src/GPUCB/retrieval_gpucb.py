@@ -54,10 +54,8 @@ class RetrievalGPUCB:
         self.y = []  # Rewards (relevance scores) observed so far
         
         # Setup GP regressor with appropriate kernel: 
-        # 1. RBF
         if kernel == "rbf":
             kernel = C(1.0) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
-        # 5. Dot Product
         elif kernel == 'dot_product':
             kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * DotProduct()
         elif kernel == 'cosine_similarity':

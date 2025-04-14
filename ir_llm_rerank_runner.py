@@ -110,7 +110,7 @@ def arg_parser():
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
-    parser.add_argument("--wandb_group", type=str, default=None, help="wandb group")
+    parser.add_argument("--wandb_group", type=str, default="baseline", help="wandb group")
 
     args = parser.parse_args()
     return args

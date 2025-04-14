@@ -254,9 +254,10 @@ def bandit_retrieval(
         passage_embeddings: list, 
         passages: list, 
         llm: LLM, 
-        query, 
-        query_embedding, 
-        query_id, 
+        query,
+        query_embedding,
+        query_id,
+        use_query=False,
         beta=2.0, 
         acq_func="ucb",
         llm_budget: int=10, 
@@ -280,6 +281,7 @@ def bandit_retrieval(
         query: Query text
         query_embedding: Optional query embedding
         query_id: Optional query ID for ground truth lookups
+        use_query: Whether to use query embedding as an input to GP-UCB.
         beta: Exploration-exploitation trade-off parameter
         llm_budget: Number of LLM calls to make
         k_cold_start: Number of random samples to collect initially
@@ -295,7 +297,9 @@ def bandit_retrieval(
     k_cold_start = min(k_cold_start, llm_budget)
     
     gpucb = RetrievalGPUCB(beta=beta, kernel=kernel, acquisition_function=acq_func) # set up GP-UCB
-    
+    if use_query:
+        gpucb.update(query_embedding, 3.0)
+
     available_ids = passage_ids.copy()
     id_to_embedding = {pid: emb for pid, emb in zip(passage_ids, passage_embeddings)}
     

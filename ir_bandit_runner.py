@@ -92,7 +92,6 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 
     print("=== Bandit Runner ===")
     for i, (query, q_id) in tqdm(enumerate(zip(queries, query_ids)), desc="Query", total=len(queries)):
-        # TODO: for reranking, modify passage ids
         items, scores, founds = bandit_retrieval(
             passage_ids=passage_ids.copy(),
             passage_embeddings=passage_embeddings,
@@ -101,6 +100,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             query=query,
             query_embedding=query_embeddings[i],
             query_id=q_id,
+            use_query=args.use_query,
             beta=beta,
             acq_func=acq_func,
             kernel=kernel,
@@ -153,12 +153,17 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
+
+
+    parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
+    parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
+    parser.add_argument("--use_query", action="store_true", default=False, help="adding query")
+    parser.add_argument('--batch_size', type=int, default=1, help='batch size for bandit')
+
     parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'random', 'greedy'])
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
-    parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
-    parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
-    parser.add_argument('--batch_size', type=int, default=1, help='batch size for bandit')
+
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])

@@ -31,7 +31,7 @@ def main(dataset_name, model_name, args, save_flag=True):
     dataset = handle_dataset(dataset_name)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
-                                                             queries, passages)
+                                                             queries, passages, batch_size=args.batch_size)
 
     ################### Configuration ###################
 
@@ -94,7 +94,7 @@ def main(dataset_name, model_name, args, save_flag=True):
         wandb.log(updated_dict)
 
     if save_flag:
-        assert save_results(configs, results, result_path) == True, "Results not saved"
+        save_results(configs, results, result_path)
         print(f"Results saved to {result_path}")
 
 
@@ -102,10 +102,11 @@ def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
+    parser.add_argument("--batch_size", type=int, default=64, help="batch size for embedding")
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
-    parser.add_argument("--wandb_group", type=str, default=None, help="wandb group")
+    parser.add_argument("--wandb_group", type=str, default="baseline", help="wandb group")
 
     args = parser.parse_args()
     return args
