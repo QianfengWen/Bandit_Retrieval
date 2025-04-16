@@ -36,11 +36,11 @@ class HotelChicago:
                     passage_id += 1
 
         # Step 4: Load queries
-        with open(f"data/hotel_chicago/queries.txt", "r", encoding='utf-8') as f:
+        with open(f"data/hotel_chicago/queries.txt", "r", encoding='utf-8', errors='ignore') as f:
             queries = f.read().strip().split('\n')
 
         # Step 5: Load ground truth directly from JSON
-        with open(f"data/hotel_chicago/ground_truth.json", "r", encoding='utf-8') as f:
+        with open(f"data/hotel_chicago/ground_truth.json", "r", encoding='utf-8', errors='ignore') as f:
             qrels_iter = json.load(f)
 
         # Step 6: Load cache using pandas (faster parsing)
@@ -108,7 +108,7 @@ class HotelChicago:
                 prelabel_relevance[int(query_id)][int(doc_id)] = float(score)
 
             return prelabel_relevance
-        except FileNotFoundError:
+        except Exception as e:
             return defaultdict(dict)
 
 

@@ -47,7 +47,7 @@ def main(
     # LLM Setup
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
     cache = dataset.load_cache()
-    update_cache = cache_path
+    update_cache = f"data/{dataset_name}/cache.csv"
 
     # Centralized configuration
     configs = {
@@ -156,4 +156,4 @@ def main(
             raise RuntimeError("Failed to save results.")
 
 if __name__ == "__main__":
-    main(dataset_name="travel_dest", llm_budget=25, sample_strategy="random", kernel="rbf", epsilon=0, top_k_passages=3)
+    main(dataset_name="travel_dest", llm_budget=200, sample_strategy="random", kernel="rbf", epsilon=0, top_k_passages=3)

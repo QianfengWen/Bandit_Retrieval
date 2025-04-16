@@ -86,6 +86,8 @@ def main(dataset_name, top_k_passages=50, k_retrieval=1000, fusion_mode="sum"):
         print(f"Results saved to {result_path}")
 
 if __name__ == "__main__":
-    for top_k_passages in [1, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]:
-        for k_retrieval in [100, 500, 1000, 2000, 5000, 100000]:
-            main(dataset_name="travel_dest", top_k_passages=top_k_passages)
+    # for top_k_passages in [1, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]:
+    for top_k_passages in [50]:
+        # for k_retrieval in [100, 500, 1000, 2000, 5000, 100000]:
+        for k_retrieval in [126400]:
+            main(dataset_name="travel_dest", top_k_passages=top_k_passages, k_retrieval=k_retrieval)

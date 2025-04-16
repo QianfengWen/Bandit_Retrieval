@@ -32,7 +32,8 @@ def sample(
         sample_strategy, 
         sample_size=200, 
         epsilon=0.5,
-        city_max_sample=1
+        city_max_sample=1,
+        random_seed=42
     ):
     """
     Sample passages based on different strategies.
@@ -54,8 +55,8 @@ def sample(
         raise ValueError(f"Invalid sample strategy. Choose from: {SAMPLE_STRATEGIES}")
 
     # Ensure deterministic results
-    random.seed(42)
-    np.random.seed(42)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
     # Create a fast lookup from passage_id to index
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
@@ -166,7 +167,8 @@ def gp_retrieval(
         batch_size: int = 5, 
         cache: dict = None, 
         update_cache = None,
-        verbose: bool = False
+        verbose: bool = False,
+        random_seed: int = 42
     ):
     """
     Perform GP-based retrieval using LLM for scoring.
@@ -217,9 +219,10 @@ def gp_retrieval(
         passage_embeddings=passage_embeddings,
         passage_dict=passage_dict,
         sample_strategy=sample_strategy,
-        sample_size=llm_budget - 1,
+        sample_size=llm_budget,
         epsilon=epsilon,
-        city_max_sample=city_max_sample
+        city_max_sample=city_max_sample,
+        random_seed=random_seed
     )
 
     ############### Batch Processing ################
@@ -472,5 +475,86 @@ def llm_rerank(
     print("Please run llm_baseline_runner.py to generate LLM scores for the query")
     return passage_ids[:k_retrieval]  # fallback
 
+def cross_encoder_rerank(
+        passage_ids: list[int], 
+        passage_embeddings: list, 
+        passages_text: list,
+        query_embedding, 
+        query_id: int, 
+        k_retrieval: int=1000,
+        return_score: bool=False, 
+        cross_encoder_model=None,
+        query_text: str=None
+    ):
+    """
+    Rerank using a cross-encoder model; append dense results beyond k_retrieval without reranking.
     
+    Args:
+        passage_ids: List of passage IDs
+        passage_embeddings: List of passage embeddings
+        query_embedding: Query embedding vector
+        query_id: Query ID for cache lookup
+        k_retrieval: Number of passages to retrieve
+        return_score: Whether to return scores along with passage IDs
+        cache: Cache dictionary for storing cross-encoder scores
+        cross_encoder_model: The cross-encoder model to use for reranking
+        query_text: The text of the query (required for cross-encoder)
+        
+    Returns:
+        List of passage IDs ranked by relevance, and optionally their scores
+    """
+    if cross_encoder_model is None:
+        raise ValueError("Cross-encoder model must be provided")
+    
+    if query_text is None:
+        raise ValueError("Query text must be provided for cross-encoder reranking")
+    
+    # Step 1: Retrieve top N (>= k_retrieval) with dense retrieval
+    passage_ids, dense_score = dense_retrieval(
+        passage_ids, passage_embeddings, query_embedding, 
+        k_retrieval=max(k_retrieval * 2, len(passage_ids)), return_score=True
+    )
+    
+    # Build dense score dict for all
+    dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
+    
+    # Separate top-k for reranking and rest
+    top_k_passages = passage_ids[:k_retrieval]
+    rest_passages = passage_ids[k_retrieval:]
+    top_k_passages_idx = [passage_ids.index(pid) for pid in top_k_passages]
+    
+    # Get passage texts for the top-k passages
+    # Note: This assumes passage_ids are indices into a passage collection
+    # You may need to adjust this based on your actual data structure
+    passage_texts = [passages_text[idx] for idx in top_k_passages_idx]
+    
+    # Create query-passage pairs for cross-encoder
+    query_passage_pairs = [(query_text, passage_text) for passage_text in passage_texts]
+    
+    # Get cross-encoder scores
+    cross_encoder_scores = cross_encoder_model.predict(query_passage_pairs)
+    
+    # Create a dictionary mapping passage IDs to cross-encoder scores
+    cross_encoder_score_dict = {pid: score for pid, score in zip(top_k_passages, cross_encoder_scores)}
+    
+    # Sort passages by cross-encoder scores
+    sorted_items = sorted(
+        cross_encoder_score_dict.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+    
+    # Extract reranked passages and scores
+    reranked_passages = [pid for pid, _ in sorted_items]
+    reranked_scores = [score for _, score in sorted_items]
+    
+    # Append the rest of the dense results
+    final_passages = reranked_passages + rest_passages
+    
+    if return_score:
+        final_scores = reranked_scores + [dense_score_dict[pid] for pid in rest_passages]
+        return final_passages, final_scores
+    
+    return final_passages
+
     

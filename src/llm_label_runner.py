@@ -24,8 +24,8 @@ def main():
     dataset = TravelDest()
     dataset_name = "travel_dest"
     model_name = "all-MiniLM-L6-v2"
-    batch_size = 1
-    num = 1000
+    batch_size = 5
+    num = 200
 
     output_path = "data/travel_dest/cache.csv"
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
@@ -33,7 +33,7 @@ def main():
 
 
     # Load dataset
-    question_ids, queries, passage_ids, passages, relevance_map, passage_to_city, prelabel_relevance = dataset.load_data()
+    question_ids, queries, passage_ids, passages, relevance_map, passage_dict, passage_city_map, prelabel_relevance = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, queries, passages)
 
     llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
