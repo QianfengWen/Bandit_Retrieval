@@ -7,6 +7,10 @@ from src.Dataset.restaurant_phi import RestaurantPhi
 from src.Dataset.restaurant_nor import RestaurantNor
 from src.Dataset.travel_dest import TravelDest
 from src.Dataset.point_rec_us import PointRecUS
+from src.Dataset.hotel_chicago import HotelChicago
+from src.Dataset.hotel_london import HotelLondon
+from src.Dataset.hotel_montreal import HotelMontreal
+from src.Dataset.hotel_nyc import HotelNYC
 
 
 def handle_dataset(dataset_name):
@@ -18,6 +22,14 @@ def handle_dataset(dataset_name):
         dataset = TravelDest()
     elif dataset_name == "point_rec_us":
         dataset = PointRecUS()
+    elif dataset_name == "hotel_chicago":
+        dataset = HotelChicago()
+    elif dataset_name == "hotel_london":
+        dataset = HotelLondon()
+    elif dataset_name == "hotel_montreal":
+        dataset = HotelMontreal()
+    elif dataset_name == "hotel_nyc":
+        dataset = HotelNYC()
     return dataset
 
 class Dataloader(ABC):    
