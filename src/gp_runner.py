@@ -156,4 +156,4 @@ def main(
             raise RuntimeError("Failed to save results.")
 
 if __name__ == "__main__":
-    main(dataset_name="travel_dest", llm_budget=200, sample_strategy="random", kernel="rbf", epsilon=0, top_k_passages=3)
+    main(dataset_name="point_rec_us", llm_budget=25, sample_strategy="random", kernel="rbf", epsilon=0.3, top_k_passages=3)

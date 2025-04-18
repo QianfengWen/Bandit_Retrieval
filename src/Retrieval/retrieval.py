@@ -1,5 +1,6 @@
 import numpy as np
 from src.GPUCB.gp import GaussianProcess
+from sklearn.gaussian_process import GaussianProcessRegressor
 from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from src.LLM.llm import LLM
 from tqdm import tqdm
@@ -204,7 +205,7 @@ def gp_retrieval(
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
 
     # Initialize GP-UCB model
-    gpucb = GaussianProcess(kernel=kernel)
+    gpucb = GaussianProcess(kernel=kernel, llm_budget=llm_budget)
 
     gpucb.update(query_embedding, 3.0)
 
