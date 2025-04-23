@@ -40,7 +40,7 @@ class RetrievalGPUCB:
     GP-UCB implementation specifically for retrieval tasks.
     """
     
-    def __init__(self, beta=2.0, kernel='rbf', acquisition_function='ucb'):
+    def __init__(self, beta=2.0, kernel='rbf', acquisition_function='ucb', nu=None):
         """
         Initialize the GP-UCB algorithm for retrieval
         
@@ -56,8 +56,10 @@ class RetrievalGPUCB:
         # Setup GP regressor with appropriate kernel: 
         if kernel == "rbf":
             kernel = C(1.0) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
+        elif kernel == "matern":
+            kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-5, 1e5), nu=nu)
         elif kernel == 'dot_product':
-            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * DotProduct()
+            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e5))
         elif kernel == 'cosine_similarity':
             kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * CosineSimilarityKernel()
         else:
