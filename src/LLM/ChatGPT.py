@@ -86,16 +86,16 @@ class ChatGPT(LLM):
         cache = cache or defaultdict(dict)
         cache.setdefault(query_id, {})
 
-        few_shot_examples = {
-            passage: cache[query_id][pid] 
-            for pid, passage in zip(passage_ids, passages) 
-            if pid in cache[query_id]
-        }
-
-        if few_shot_examples:
-            few_shot_texts = f"Attached are example ratings:\n{json.dumps(few_shot_examples, indent=2)}"
-        else:
-            few_shot_texts = ""
+        # few_shot_examples = {
+        #     passage: cache[query_id][pid]
+        #     for pid, passage in zip(passage_ids, passages)
+        #     if pid in cache[query_id]
+        # }
+        #
+        # if few_shot_examples:
+        #     few_shot_texts = f"Attached are example ratings:\n{json.dumps(few_shot_examples, indent=2)}"
+        # else:
+        few_shot_texts = ""
         
         formatted_passages = "\n".join([f"{i+1}. {p}" for i, p in enumerate(passages)])
         prompt_template = """
