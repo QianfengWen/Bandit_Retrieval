@@ -17,38 +17,33 @@ from collections import defaultdict
 MODE="dense_retrieval"
 
 def main(dataset_name, model_name, args, save_flag=True):
+
+    configs = dict(vars(args))
+    configs['runner'] = MODE
+
+    if not args.wandb_disable:
+        run = wandb.init(
+            project="bandit_v2",
+            config=configs,
+            group=args.wandb_group,
+        )
+    else:
+        run = None
+
     ################### Load Data ###################
     base_path = os.path.dirname(os.path.abspath(__file__))
 
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-    result_path = f"results/{dataset_name}/{model_name}_{MODE}_results.csv"
 
     query_embeddings_path = os.path.join(base_path, query_embeddings_path)
     passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
-    result_path = os.path.join(base_path, result_path)
 
     dataset = handle_dataset(dataset_name)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages, batch_size=args.batch_size)
 
-    ################### Configuration ###################
-
-    configs = {
-        "runner": MODE,
-        "dataset_name": dataset_name,
-        "model_name": model_name,
-    }
-
-    if not args.wandb_disable:
-        run = wandb.init(
-            project="bandit",
-            config=configs,
-            group=args.wandb_group,
-        )
-    else:
-        run = None
 
     ################### Evaluation ###################
     k_retrieval = max(args.cutoff)
@@ -66,7 +61,7 @@ def main(dataset_name, model_name, args, save_flag=True):
             prec_k = precision_k(items, gt, k_start)
             rec_k = recall_k(items, gt, k_start)
             map_k = mean_average_precision_k(items, gt, k_start)
-            ndcg_k = normalized_dcg_k(items, gt, k_start)
+            ndcg_k = normalized_dcg_k(items, relevance_map[q_id], k_start)
 
             prec_k_dict[k_start].append(prec_k)
             rec_k_dict[k_start].append(rec_k)
@@ -93,11 +88,6 @@ def main(dataset_name, model_name, args, save_flag=True):
             updated_dict[new_key] = v
         wandb.log(updated_dict)
 
-    if save_flag:
-        save_results(configs, results, result_path)
-        print(f"Results saved to {result_path}")
-
-
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
@@ -106,7 +96,7 @@ def arg_parser():
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
-    parser.add_argument("--wandb_group", type=str, default="baseline", help="wandb group")
+    parser.add_argument("--wandb_group", type=str, default="dense_retrieval", help="wandb group")
 
     args = parser.parse_args()
     return args

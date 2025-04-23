@@ -17,6 +17,18 @@ from collections import defaultdict
 MODE="llm_reranking"
 
 def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
+    configs = dict(vars(args))
+    configs['runner'] = MODE
+
+    if not args.wandb_disable:
+        run = wandb.init(
+            project="bandit_v2",
+            config=configs,
+            group=args.wandb_group,
+        )
+    else:
+        run = None
+
     ################### Load Data ###################
 
     base_path = os.path.dirname(os.path.abspath(__file__))
@@ -37,22 +49,6 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages)
     cache = dataset.load_cache()
-    ################### Configuration ###################
-    configs = {
-        "runner": MODE,
-        "dataset_name": dataset_name,
-        "model_name": model_name,
-        "top_k_passages": top_k_passages,
-    }
-
-    if not args.wandb_disable:
-        run = wandb.init(
-            project="bandit",
-            config=configs,
-            group=args.wandb_group,
-        )
-    else:
-        run = None
 
     ################### Evaluation ###################
     k_retrieval = top_k_passages
@@ -104,17 +100,17 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
-    parser.add_argument('--top_k_passages', type=int, default=100, help='top k passages for reranking')
+    parser.add_argument('--llm_budget', type=int, default=100, help='top k passages for reranking')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
-    parser.add_argument("--wandb_group", type=str, default="baseline", help="wandb group")
+    parser.add_argument("--wandb_group", type=str, default="llm_rerank", help="wandb group")
 
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     args = arg_parser()
-    main(dataset_name=args.dataset_name, model_name=args.emb_model, top_k_passages=args.top_k_passages, args=args)
+    main(dataset_name=args.dataset_name, model_name=args.emb_model, top_k_passages=args.llm_budget, args=args)

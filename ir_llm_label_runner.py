@@ -7,12 +7,10 @@ from src.LLM.ChatGPT import ChatGPT
 
 from src.Retrieval.retrieval import dense_retrieval, calculate_cosine_similarity
 from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import save_results
 
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
-import wandb
 
 def main(dataset_name, model_name, top_k):
     verbose = False

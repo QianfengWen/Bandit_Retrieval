@@ -17,18 +17,38 @@ import wandb
 MODE="bandit"
 
 def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, batch_size, args, save_flag=True):
+    k_retrieval = max(args.cutoff)
+    llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
+
+    if acq_func == "greedy":
+        print(f"For greedy, set k_cold_start to {llm_budget}")
+        k_cold_start = llm_budget
+
+    configs = dict(vars(args))
+    configs['runner'] = MODE
+
+    for k, v in configs.items():
+        print(f"{k}: {v}")
+
+    if not args.wandb_disable:
+        run = wandb.init(
+            project="bandit_v2",
+            config=configs,
+            group=args.wandb_group,
+        )
+    else:
+        run = None
+
     ################### Load Data ###################
     base_path = os.path.dirname(os.path.abspath(__file__))
 
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
     cache_path = f"data/{dataset_name}/cache.csv"
-    result_path = f"results/{dataset_name}/{model_name}_{MODE}_results.csv"
 
     query_embeddings_path = os.path.join(base_path, query_embeddings_path)
     passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
     cache_path = os.path.join(base_path, cache_path)
-    result_path = os.path.join(base_path, result_path)
 
     dataset = handle_dataset(dataset_name, cache_path)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
@@ -48,29 +68,6 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     else:
         verbose = False
 
-    ################### Configuration ###################
-    k_retrieval = max(args.cutoff)
-    llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
-    gpucb_percentage = (llm_budget - k_cold_start) / llm_budget
-
-    if acq_func == "greedy":
-        print(f"For greedy, set k_cold_start to {llm_budget}")
-        k_cold_start = llm_budget
-
-    configs = dict(vars(args))
-    configs['runner'] = MODE
-
-    for k, v in configs.items():
-        print(f"{k}: {v}")
-
-    if not args.wandb_disable:
-        run = wandb.init(
-            project="bandit",
-            config=configs,
-            group=args.wandb_group,
-        )
-    else:
-        run = None
 
     ################### Evaluation ###################
     ndcg_k_dict = defaultdict(list)
@@ -109,7 +106,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             prec_k = precision_k(items, gt, k_start)
             rec_k = recall_k(items, gt, k_start)
             map_k = mean_average_precision_k(items, gt, k_start)
-            ndcg_k = normalized_dcg_k(items, gt, k_start)
+            ndcg_k = normalized_dcg_k(items, relevance_map[q_id], k_start)
 
             prec_k_dict[k_start].append(prec_k)
             rec_k_dict[k_start].append(rec_k)
