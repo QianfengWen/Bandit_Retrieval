@@ -40,7 +40,7 @@ class RetrievalGPUCB:
     GP-UCB implementation specifically for retrieval tasks.
     """
     
-    def __init__(self, beta=2.0, kernel='rbf', acquisition_function='ucb', nu=None):
+    def __init__(self, beta=2.0, kernel='rbf', acquisition_function='ucb', nu=2.5, alpha=1e-3):
         """
         Initialize the GP-UCB algorithm for retrieval
         
@@ -73,7 +73,7 @@ class RetrievalGPUCB:
             
         self.gp = GaussianProcessRegressor(
             kernel=kernel,
-            alpha=1e-3,  # Small noise to avoid numerical issues
+            alpha=alpha,  # Small noise to avoid numerical issues
             normalize_y=True,
             n_restarts_optimizer=5,
             random_state=42,

@@ -97,7 +97,7 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
         wandb.log(updated_dict)
 
     if save_flag:
-        assert save_results(configs, results, result_path) == True, "Results not saved"
+        save_results(configs, results, result_path)
         print(f"Results saved to {result_path}")
 
 

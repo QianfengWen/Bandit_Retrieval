@@ -35,7 +35,6 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages)
     cache = dataset.load_cache()
-    print(cache)
 
     if args.debug:
         print("DEBUG MODE")
@@ -57,20 +56,9 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     if acq_func == "greedy":
         print(f"For greedy, set k_cold_start to {llm_budget}")
         k_cold_start = llm_budget
-    configs = {
-        "runner": MODE,
-        "dataset_name": dataset_name,
-        "model_name": model_name,
-        "k_retrieval": k_retrieval,
-        "llm_budget": llm_budget,
-        "k_cold_start": k_cold_start,
 
-        "beta": beta,
-        "kernel": kernel,
-        "acq_func": acq_func,
-        "ucb_percentage": gpucb_percentage,
-        "batch_size": args.batch_size,
-    }
+    configs = dict(vars(args))
+    configs['runner'] = MODE
 
     for k, v in configs.items():
         print(f"{k}: {v}")
@@ -101,7 +89,9 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             query_embedding=query_embeddings[i],
             query_id=q_id,
             use_query=args.use_query,
+            alpha=args.alpha,
             beta=beta,
+            nu=args.nu,
             acq_func=acq_func,
             kernel=kernel,
             llm_budget=llm_budget,
@@ -145,11 +135,6 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             updated_dict[new_key] = v
         wandb.log(updated_dict)
 
-    if save_flag:
-        assert save_results(configs, results, result_path) == True, "Results not saved"
-        print(f"Results saved to {result_path}")
-
-
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
@@ -157,11 +142,13 @@ def arg_parser():
 
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
-    parser.add_argument("--use_query", action="store_true", default=False, help="adding query")
+    parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
     parser.add_argument('--batch_size', type=int, default=1, help='batch size for bandit')
 
     parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'random', 'greedy'])
+    parser.add_argument("--alpha", type=float, default=1e-3)
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
+    parser.add_argument("--nu", type=float, default=None, help='nu for Matern Kernel')
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
 
 
