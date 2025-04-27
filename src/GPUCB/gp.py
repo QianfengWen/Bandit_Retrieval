@@ -36,7 +36,7 @@ class GaussianProcess:
     Gaussian Process implementation for retrieval tasks.
     """
 
-    def __init__(self, kernel="rbf", llm_budget=0):
+    def __init__(self, kernel="rbf", llm_budget=0, normalize_y=True, alpha=1e-3):
         """
         Initialize the Gaussian Process model.
 
@@ -63,10 +63,12 @@ class GaussianProcess:
             return res.x, res.fun
         
         if llm_budget > 0:
+            print(f"normalize_y is set to {normalize_y}")
+            print(f"alpha is set to {alpha}")
             self.gp = GaussianProcessRegressor(
                 kernel=self.kernel,
-                alpha=1e-3,
-                normalize_y=True,
+                alpha=alpha,
+                normalize_y=normalize_y,
                 n_restarts_optimizer=5,
                 random_state=42,
                 optimizer=optimizer

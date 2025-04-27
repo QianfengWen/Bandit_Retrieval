@@ -169,7 +169,9 @@ def gp_retrieval(
         cache: dict = None, 
         update_cache = None,
         verbose: bool = False,
-        random_seed: int = 42
+        random_seed: int = 42,
+        normalize_y: bool = True,
+        alpha: float = 1e-3
     ):
     """
     Perform GP-based retrieval using LLM for scoring.
@@ -205,7 +207,7 @@ def gp_retrieval(
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
 
     # Initialize GP-UCB model
-    gpucb = GaussianProcess(kernel=kernel, llm_budget=llm_budget)
+    gpucb = GaussianProcess(kernel=kernel, llm_budget=llm_budget, normalize_y=normalize_y, alpha=alpha)
 
     gpucb.update(query_embedding, 3.0)
 
