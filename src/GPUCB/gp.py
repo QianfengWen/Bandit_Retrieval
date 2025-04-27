@@ -36,7 +36,7 @@ class GaussianProcess:
     Gaussian Process implementation for retrieval tasks.
     """
 
-    def __init__(self, kernel="rbf", llm_budget=0, normalize_y=True, alpha=1e-3):
+    def __init__(self, kernel="rbf", llm_budget=0, normalize_y=True, alpha=1e-3, length_scale=1.0):
         """
         Initialize the Gaussian Process model.
 
@@ -48,7 +48,8 @@ class GaussianProcess:
         self.y = []
         
         if kernel == "rbf":
-            self.kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
+            print(f"Using RBF kernel with length scale: {length_scale}")
+            self.kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * RBF(length_scale=length_scale, length_scale_bounds=(1e-5, 1e5))
         elif kernel == 'dot_product':
             self.kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * DotProduct()
         elif kernel == 'cosine_similarity':

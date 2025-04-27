@@ -22,7 +22,8 @@ def main(
         fusion_method="sum",
         random_seed=42,
         normalize_y=True,
-        alpha=1e-5
+        alpha=1e-5,
+        length_scale=1.0
     ):
     ############## Load Dataset ##############
     dataset_name = dataset_name
@@ -102,7 +103,8 @@ def main(
             verbose=False,
             random_seed=random_seed,
             normalize_y=normalize_y,
-            alpha=alpha
+            alpha=alpha,
+            length_scale=length_scale
         )
 
         # Fusion of Passage Scores into City Scores
@@ -160,4 +162,4 @@ def main(
             raise RuntimeError("Failed to save results.")
 
 if __name__ == "__main__":
-    main(dataset_name="travel_dest", llm_budget=10, sample_strategy="random", kernel="rbf", epsilon=0, top_k_passages=3, normalize_y=True, alpha=1e-1)
+    main(dataset_name="travel_dest", llm_budget=10, sample_strategy="random", kernel="rbf", epsilon=0, top_k_passages=3, normalize_y=True, alpha=1e-1, length_scale=1.0)
