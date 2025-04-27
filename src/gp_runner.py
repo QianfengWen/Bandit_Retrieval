@@ -64,6 +64,9 @@ def main(
         "batch_size": batch_size,
         "fusion_method": fusion_method,
         "random_seed": random_seed,
+        "normalize_y": normalize_y,
+        "alpha": alpha,
+        "length_scale": length_scale
     }
 
     # Automatically generate file names based on config values
