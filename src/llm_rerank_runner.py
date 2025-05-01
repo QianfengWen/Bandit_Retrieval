@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
 
-def main(dataset_name, budget=50, top_k_passages=5, fusion_mode="sum", cross_encoder_reranking=False):
+def main(dataset_name, budget=50, top_k_passages=3, fusion_mode="sum", cross_encoder_reranking=False):
     ################### Load Data ###################
     dataset_name = dataset_name
     model_name = "all-MiniLM-L6-v2"
@@ -46,24 +46,26 @@ def main(dataset_name, budget=50, top_k_passages=5, fusion_mode="sum", cross_enc
     prec_k_dict = defaultdict(list)
     rec_k_dict = defaultdict(list)
     map_k_dict = defaultdict(list)
+    ndcg_k_dict = defaultdict(list)
 
     for q_id, query, query_embedding in tqdm(zip(question_ids, queries, query_embeddings), desc="Query", total=len(question_ids)):
         if cross_encoder_reranking:
             item, score = cross_encoder_rerank(passage_ids, passage_embeddings, passages, query_embedding, q_id, k_retrieval= budget, return_score=True, cross_encoder_model=cross_encoder_model, query_text=query)
         else:
             item, score = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval= budget, cache=prelabel_relevance, return_score=True)
-
         k_start = 10
         bandit_cities = fusion_score(item, score, passage_city_map, top_k_passages=top_k_passages, return_scores=False, fusion_mode=fusion_mode)
         while k_start <= k_eval:
-            prec_k, rec_k, map_k = eval_rec(bandit_cities, list(relevance_map[q_id].keys()), k_start, verbose=verbose)
+            prec_k, rec_k, map_k, ndcg_k_score = eval_rec(bandit_cities, list(relevance_map[q_id].keys()), k_start, verbose=verbose)
             prec_k_dict[k_start].append(prec_k)
             rec_k_dict[k_start].append(rec_k)
             map_k_dict[k_start].append(map_k)
+            ndcg_k_dict[k_start].append(ndcg_k_score)
             if verbose:
                 print(f"Precision@{k_start}: {prec_k}\n")
                 print(f"Recall@{k_start}: {rec_k}\n")
                 print(f"MAP@{k_start}: {map_k}")
+                print(f"NDCG@{k_start}: {ndcg_k_score}")
             k_start += 10
             
         if verbose:
@@ -78,15 +80,17 @@ def main(dataset_name, budget=50, top_k_passages=5, fusion_mode="sum", cross_enc
         print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
         print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
         print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
+        print(f"NDCG@{k}: {np.mean(ndcg_k_dict[k])}\n")
         results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
         results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
         results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
+        results[f"ndcg@{k}"] = np.mean(ndcg_k_dict[k]).round(4)
 
     if save_flag:
         assert save_results(configs, results, result_path) == True, "Results not saved"
         print(f"Results saved to {result_path}")
 
 if __name__ == "__main__":
-    for budget in [126400]:
-        for top_k_passages in [3]:
-            main(dataset_name="travel_dest", budget=budget, top_k_passages=top_k_passages, fusion_mode="sum", cross_encoder_reranking=True)
+    for name in ["travel_dest"]:
+        for budget in [1, 5]:
+            main(dataset_name=name, budget=budget, top_k_passages=3, fusion_mode="sum", cross_encoder_reranking=True)

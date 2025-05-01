@@ -1,4 +1,4 @@
-from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k
+from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k, ndcg_k
 from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
 from collections import defaultdict
 import pandas as pd
@@ -155,8 +155,9 @@ def eval_rec(cities, ground_truth, k, verbose=False):
     prec_k = precision_k(top_k_cities, ground_truth, k)
     rec_k = recall_k(top_k_cities, ground_truth, k)
     map_k = mean_average_precision_k(top_k_cities, ground_truth, k)
+    ndcg = ndcg_k(top_k_cities, ground_truth, k)
 
-    return prec_k, rec_k, map_k
+    return prec_k, rec_k, map_k, ndcg
 
 
 def save_results(configs, results, file_path):

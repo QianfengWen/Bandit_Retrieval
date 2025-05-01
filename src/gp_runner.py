@@ -18,7 +18,7 @@ def main(
         city_max_sample=1,
         top_k_passages=1,
         k_retrieval=1000,
-        batch_size=5, 
+        batch_size=1, 
         fusion_method="sum",
         random_seed=42,
         normalize_y=True,

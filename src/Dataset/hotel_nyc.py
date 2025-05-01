@@ -28,7 +28,7 @@ class HotelNYC:
             passage_dict[city_id] = []  
 
             # Read file content at once for faster I/O
-            with open(f"data/hotel_nyc/corpus/{file}", "r", encoding='utf-8') as f:
+            with open(f"data/hotel_nyc/corpus/{file}", "r", encoding='latin-1') as f:
                 city_passages = f.read().strip().split('\n')
                 for passage in city_passages:
                     passages.append(passage)  
@@ -36,11 +36,11 @@ class HotelNYC:
                     passage_id += 1
 
         # Step 4: Load queries
-        with open(f"data/hotel_nyc/queries.txt", "r", encoding='utf-8', errors='ignore') as f:
+        with open(f"data/hotel_nyc/queries.txt", "r", encoding='latin-1', errors='ignore') as f:
             queries = f.read().strip().split('\n')
 
         # Step 5: Load ground truth directly from JSON
-        with open(f"data/hotel_nyc/ground_truth.json", "r", encoding='utf-8', errors='ignore') as f:
+        with open(f"data/hotel_nyc/ground_truth.json", "r", encoding='latin-1', errors='ignore') as f:
             qrels_iter = json.load(f)
 
         # Step 6: Load cache using pandas (faster parsing)
