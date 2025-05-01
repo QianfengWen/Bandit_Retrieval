@@ -24,6 +24,8 @@
     ```bash
     unzip data.zip
 
+if you cannot download the data.zip, please use the following link: https://figshare.com/s/a0842e36b37ba9b2a46f?file=54121907.
+
 ## Usage
 1. **Baseline Dense Retrieval**
     ```bash
