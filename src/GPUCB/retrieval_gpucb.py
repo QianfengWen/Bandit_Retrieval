@@ -40,7 +40,7 @@ class RetrievalGPUCB:
     GP-UCB implementation specifically for retrieval tasks.
     """
     
-    def __init__(self, beta=2.0, kernel='rbf', acquisition_function='ucb', nu=2.5, alpha=1e-3):
+    def __init__(self, beta=2.0, kernel='rbf', alpha=1e-3, length_scale=1, acquisition_function='ucb', nu=2.5):
         """
         Initialize the GP-UCB algorithm for retrieval
         
@@ -55,13 +55,13 @@ class RetrievalGPUCB:
         
         # Setup GP regressor with appropriate kernel: 
         if kernel == "rbf":
-            kernel = C(1.0) * RBF(length_scale=1.0, length_scale_bounds=(1e-5, 1e5))
+            kernel = C(1.0) * RBF(length_scale=length_scale, length_scale_bounds=(1e-3, 1e2))
         elif kernel == "matern":
-            kernel = C(1.0) * Matern(length_scale=1.0, length_scale_bounds=(1e-5, 1e5), nu=nu)
+            kernel = C(1.0) * Matern(length_scale=length_scale, length_scale_bounds=(1e-3, 1e2), nu=nu)
         elif kernel == 'dot_product':
-            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e5))
+            kernel = C(1.0) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e5))
         elif kernel == 'cosine_similarity':
-            kernel = C(1.0, constant_value_bounds=(1e-5, 1e5)) * CosineSimilarityKernel()
+            kernel = C(1.0) * CosineSimilarityKernel()
         else:
             raise ValueError("Invalid kernel specified.")
 

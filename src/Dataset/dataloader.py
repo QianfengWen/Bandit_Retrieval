@@ -9,6 +9,9 @@ from src.Dataset.restaurant_phi import RestaurantPhi
 from src.Dataset.restaurant_nor import RestaurantNor
 from src.Dataset.travel_dest import TravelDest
 from src.Dataset.point_rec_us import PointRecUS
+from src.Dataset.nfcorpus import NfCorpus
+from src.Dataset.dl19 import DL19
+from src.Dataset.dl20 import DL20
 
 
 def handle_dataset(dataset_name, cache_path=None):
@@ -24,6 +27,12 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = Covid(cache_path=cache_path)
     elif dataset_name == "touche":
         dataset = Touche(cache_path=cache_path)
+    elif dataset_name == 'nfcorpus':
+        dataset = NfCorpus(cache_path=cache_path)
+    elif dataset_name == 'dl19':
+        dataset = DL19(cache_path=cache_path)
+    elif dataset_name == 'dl20':
+        dataset = DL20(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset

@@ -39,8 +39,10 @@ def main(dataset_name, model_name, args, save_flag=True):
     query_embeddings_path = os.path.join(base_path, query_embeddings_path)
     passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
 
+    print("Loading dataset...")
     dataset = handle_dataset(dataset_name)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
+    print("Loading embeddings...")
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages, batch_size=args.batch_size)
 

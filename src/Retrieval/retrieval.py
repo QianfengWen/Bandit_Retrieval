@@ -260,6 +260,7 @@ def bandit_retrieval(
         use_query=None,
         alpha=1e-3,
         beta=2.0,
+        length_scale=1,
         nu=2.5,
         acq_func="ucb",
         llm_budget: int=10, 
@@ -300,7 +301,7 @@ def bandit_retrieval(
     
     k_cold_start = min(k_cold_start, llm_budget)
     
-    gpucb = RetrievalGPUCB(beta=beta, kernel=kernel, acquisition_function=acq_func, alpha=alpha, nu=nu) # set up GP-UCB
+    gpucb = RetrievalGPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, acquisition_function=acq_func, nu=nu) # set up GP-UCB
     if use_query is not None:
         gpucb.update(query_embedding, use_query)
 

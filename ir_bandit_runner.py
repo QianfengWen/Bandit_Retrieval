@@ -88,6 +88,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             use_query=args.use_query,
             alpha=args.alpha,
             beta=beta,
+            length_scale=args.length_scale,
             nu=args.nu,
             acq_func=acq_func,
             kernel=kernel,
@@ -136,7 +137,6 @@ def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
 
-
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
     parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
@@ -145,9 +145,9 @@ def arg_parser():
     parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'random', 'greedy'])
     parser.add_argument("--alpha", type=float, default=1e-3)
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
+    parser.add_argument("--length_scale", type=float, default=1)
     parser.add_argument("--nu", type=float, default=None, help='nu for Matern Kernel')
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
-
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])

@@ -36,13 +36,10 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
     cache_path = f"data/{dataset_name}/cache.csv"
-    result_path = f"results/{dataset_name}/{model_name}_{MODE}_results.csv"
 
     query_embeddings_path = os.path.join(base_path, query_embeddings_path)
     passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
     cache_path = os.path.join(base_path, cache_path)
-    result_path = os.path.join(base_path, result_path)
-    print("result_path: ", result_path, "\n")
 
     dataset = handle_dataset(dataset_name, cache_path)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
@@ -66,7 +63,7 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
             prec_k = precision_k(items, gt, k_start)
             rec_k = recall_k(items, gt, k_start)
             map_k = mean_average_precision_k(items, gt, k_start)
-            ndcg_k = normalized_dcg_k(items, gt, k_start)
+            ndcg_k = normalized_dcg_k(items, relevance_map[q_id], k_start)
 
             prec_k_dict[k_start].append(prec_k)
             rec_k_dict[k_start].append(rec_k)
@@ -91,10 +88,6 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
             new_key = str(k).replace("@", "/")
             updated_dict[new_key] = v
         wandb.log(updated_dict)
-
-    if save_flag:
-        save_results(configs, results, result_path)
-        print(f"Results saved to {result_path}")
 
 
 def arg_parser():

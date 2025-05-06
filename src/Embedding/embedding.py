@@ -21,8 +21,10 @@ def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_p
         query_prompt = None
     print("Encoding queries..")
     query_embeddings = embedder.encode(query_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size, prompt=query_prompt)
+    query_embeddings = query_embeddings.to('cpu')
     print("Encoding passages..")
     passages_embeddings = embedder.encode(passage_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size)
+    passages_embeddings = passages_embeddings.to('cpu')
 
     save_embeddings(query_embeddings, passages_embeddings, query_embeddings_path, passage_embeddings_path)
    
