@@ -41,9 +41,9 @@ class ChatGPT(LLM):
     
     def get_score(
             self, 
-            query: str, 
+            queries: str,
             passages: list[str], 
-            query_id: int = None, 
+            query_ids: int,
             passage_ids: list[int] = None,
             cache: dict = None,
             update_cache: str = None,
@@ -64,8 +64,8 @@ class ChatGPT(LLM):
         """
         if cache:
             try:
-                assert query_id is not None and passage_ids is not None
-                all_ratings = cache[query_id]
+                assert query_ids is not None and passage_ids is not None
+                all_ratings = cache[query_ids]
                 target_ratings = [all_ratings[p_id] for p_id in passage_ids]
                 # print(f"Cache hit for query {query_id}, using precomputed ratings ...")
                 return target_ratings
@@ -84,7 +84,8 @@ class ChatGPT(LLM):
 
         # cache miss for some passages
         cache = cache or defaultdict(dict)
-        cache.setdefault(query_id, {})
+        for qid in query_ids:
+            cache.setdefault(qid, {})
 
         # few_shot_examples = {
         #     passage: cache[query_id][pid]
@@ -116,8 +117,6 @@ class ChatGPT(LLM):
         Measure how trustworthy the passage is (T).
         Consider the aspects above and the relative importance of each, and decide on a final score (O). Final score must be an integer value only.
         Do not provide any code in result. Return a JSON object mapping passage index to its relevance score, the index starts from 0.
-        
-        {few_shot_texts}
         """
         prompt = [
             {"role": "system", "content": "You are an assistant that evaluates the relevance of passages to a given query. "},
@@ -129,12 +128,12 @@ class ChatGPT(LLM):
         try:
             scores = json.loads(response)["scores"]
             scores = [scores.get(str(i), -1) for i in range(len(passages))] 
-            if update_cache and query_id is not None and passage_ids is not None:
+            if update_cache and query_ids is not None and passage_ids is not None:
                 new_entries = []
                 
                 for p_id, score in zip(passage_ids, scores):
-                    if p_id not in cache[query_id]:
-                        new_entries.append([query_id, p_id, score])
+                    if p_id not in cache[query_ids]:
+                        new_entries.append([query_ids, p_id, score])
 
                 if new_entries:
                     # print(f"Updating cache with {len(new_entries)} new entries ...")

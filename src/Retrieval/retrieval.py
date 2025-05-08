@@ -333,7 +333,7 @@ def bandit_retrieval(
             batch_passages = [passages[idx] for idx in passage_idxs]
 
             # get relevance scores for the batch using LLM
-            batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=batch, cache=cache, update_cache=update_cache)
+            batch_scores = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=batch, cache=cache, update_cache=update_cache)
             
             # store observations
             for target_id, score in zip(batch, batch_scores):
@@ -374,7 +374,7 @@ def bandit_retrieval(
         passage_idxs = [passage_ids.index(next_id) for next_id in next_ids]
         batch_passages = [passages[idx] for idx in passage_idxs]
 
-        batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=next_ids, cache=cache, update_cache=update_cache)
+        batch_scores = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=next_ids, cache=cache, update_cache=update_cache)
 
         for next_id, score in zip(next_ids, batch_scores):
             scores[next_id] = score

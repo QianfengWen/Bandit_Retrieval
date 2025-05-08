@@ -9,16 +9,18 @@ from src.Dataset.dataloader import handle_dataset
 from src.Embedding.embedding import handle_embeddings
 from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k, normalized_dcg_k
 from src.LLM.ChatGPT import ChatGPT
+from src.LLM.llm_utils import handle_llm
 from src.RecUtils.rec_utils import save_results
 from src.Retrieval.retrieval import bandit_retrieval
 
 import wandb
+from utils import load_dataset
 
 MODE="bandit"
 
 def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, batch_size, args, save_flag=True):
     k_retrieval = max(args.cutoff)
-    llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
+    llm = handle_llm(args.llm_name)
 
     if acq_func == "greedy":
         print(f"For greedy, set k_cold_start to {llm_budget}")
@@ -40,21 +42,8 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         run = None
 
     ################### Load Data ###################
-    base_path = os.path.dirname(os.path.abspath(__file__))
-
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-    cache_path = f"data/{dataset_name}/cache.csv"
-
-    query_embeddings_path = os.path.join(base_path, query_embeddings_path)
-    passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
-    cache_path = os.path.join(base_path, cache_path)
-
-    dataset = handle_dataset(dataset_name, cache_path)
-    query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
-    query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
-                                                             queries, passages)
-    cache = dataset.load_cache()
+    dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings = (
+        load_dataset(dataset_name, model_name, args.llm_name))
 
     if args.debug:
         print("DEBUG MODE")
@@ -136,7 +125,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
-
+    parser.add_argument("--llm_name", type=str)
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
     parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
