@@ -104,7 +104,7 @@ Do not provide any code or in result. Respond only with the final score in the f
 
         batch_outputs = self.model.generate(
             **batch_inputs,
-            max_new_tokens = ,
+            max_new_tokens = 128,
             use_cache = True,
             temperature = 1,
             min_p = 0.1)
