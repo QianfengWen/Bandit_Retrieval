@@ -322,7 +322,7 @@ def bandit_retrieval(
             print("There are ", len(cold_start_ids), " cold start ids")
             print("Cold start ids: ", cold_start_ids)
         cold_start_batches = [cold_start_ids[i:i + batch_size] for i in range(0, len(cold_start_ids), batch_size)]
-        
+
         for batch in cold_start_batches:
             # remove batch items from available IDs
             for target_id in batch:
@@ -334,7 +334,7 @@ def bandit_retrieval(
 
             # get relevance scores for the batch using LLM
             batch_scores = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=batch, cache=cache, update_cache=update_cache)
-            
+
             # store observations
             for target_id, score in zip(batch, batch_scores):
                 scores[target_id] = score
@@ -424,7 +424,7 @@ def llm_rerank(
         passage_embeddings: list, 
         query_embedding, 
         query_id: int, 
-        k_retrieval: int=1000,
+        k_retrieval: int,
         return_score: bool=False, 
         cache: dict=None    
     ):
@@ -435,17 +435,16 @@ def llm_rerank(
     dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
     if cache:
         valid_cached_items = {
-            pid: score for pid, score in cache[query_id].items() if pid in passage_ids
+            pid: score for pid, score in cache[str(query_id)].items() if str(pid) in passage_ids
         }
-
         sorted_item = sorted(valid_cached_items.items(), key=lambda x: (x[1], dense_score_dict[x[0]]), reverse=True)[:k_retrieval]
         sorted_passages = [key for key, _ in sorted_item]
         if return_score:
             sorted_scores = [value for _, value in sorted_item]
             return sorted_passages, sorted_scores
         return sorted_passages
-
-    print(f"Cache miss for query {query_id}, using LLM ...")
-    print("Please run llm_baseline_runner.py to generate LLM scores for the query")
+    else:
+        print(f"Cache miss for query {query_id}, using LLM ...")
+        print("Please run llm_baseline_runner.py to generate LLM scores for the query")
     
     

@@ -1,8 +1,8 @@
 import argparse
-from collections import defaultdict
 
 import numpy as np
 from tqdm import tqdm
+import wandb
 
 from src.LLM.llm_utils import handle_llm
 from src.Retrieval.retrieval import calculate_cosine_similarity
@@ -13,11 +13,28 @@ def main(dataset_name, model_name, top_k, args):
     verbose = False
     ################### Load Data ###################
 
+    config = dict(vars(args))
+    config['runner'] = 'label'
+    wandb.init(
+        project='bandit_v3',
+        config=config,
+        name=f"{dataset_name}_{model_name}_{args.part}/{args.total}",
+    )
     dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings =(
         load_dataset(dataset_name, model_name, args.llm_name))
 
+
+    if args.total is not None and args.part is not None:
+        print(f"> {args.part}th part in total: {args.total}")
+        start = len(queries) // args.total * (args.part-1)
+        end = len(queries) // args.total * args.part
+        print(f"> Starting in indx {start} to {end}")
+
+        queries = queries[start:end]
+        query_ids = query_ids[start:end]
+        query_embeddings = query_embeddings[start:end]
+
     llm = handle_llm(args.llm_name)
-    rating_results = defaultdict(dict)
     hit, total = 0, 0
 
     for q_id, query, query_embedding in tqdm(zip(query_ids, queries, query_embeddings), desc="Labeling with LLM",
@@ -45,15 +62,14 @@ def main(dataset_name, model_name, top_k, args):
                 update_cache=dataset.cache_path,
             )
 
-            for p_id, score in zip(batch_passage_ids, scores):
-                rating_results[q_id][p_id] = score
-
     print(f"Total: {total}, Hit: {hit}, Hit rate: {hit / total:.4f}")
 
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
+    parser.add_argument("--part", type=int)
+    parser.add_argument("--total", type=int)
     parser.add_argument("--llm_name", type=str)
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--top_k", type=int, default=100, help="top k passages to retrieve")

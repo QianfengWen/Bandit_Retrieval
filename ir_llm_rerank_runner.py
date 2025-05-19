@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 import wandb
@@ -6,13 +7,14 @@ import wandb
 from src.Dataset.dataloader import handle_dataset
 from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
 
-from src.Retrieval.retrieval import dense_retrieval, llm_rerank
+from src.Retrieval.retrieval import llm_rerank
 from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import save_results
 
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
+
+from utils import load_dataset
 
 MODE="llm_reranking"
 
@@ -22,30 +24,17 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
 
     if not args.wandb_disable:
         run = wandb.init(
-            project="bandit_v2",
+            project="bandit_v3",
             config=configs,
             group=args.wandb_group,
         )
     else:
         run = None
 
-    ################### Load Data ###################
+    dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings = (
+        load_dataset(dataset_name, model_name, args.llm_name))
 
-    base_path = os.path.dirname(os.path.abspath(__file__))
 
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-    cache_path = f"data/{dataset_name}/cache.csv"
-
-    query_embeddings_path = os.path.join(base_path, query_embeddings_path)
-    passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
-    cache_path = os.path.join(base_path, cache_path)
-
-    dataset = handle_dataset(dataset_name, cache_path)
-    query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
-    query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
-                                                             queries, passages)
-    cache = dataset.load_cache()
 
     ################### Evaluation ###################
     k_retrieval = top_k_passages
@@ -54,10 +43,16 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
     rec_k_dict = defaultdict(list)
     map_k_dict = defaultdict(list)
 
+    total_pred = {}
+
     print("=== LLM Reranking ===")
     for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc="Reranking", total=len(query_ids)):
         items = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval=k_retrieval, cache=cache, return_score=False)
         gt = set([p_id for p_id, relevance in relevance_map[q_id].items() if relevance >= dataset.relevance_threshold])
+        total_pred[q_id] = {
+            'gt': list(gt),
+            'pred': items
+        }
 
         for k_start in args.cutoff:
             prec_k = precision_k(items, gt, k_start)
@@ -89,10 +84,14 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
             updated_dict[new_key] = v
         wandb.log(updated_dict)
 
+        os.makedirs(f"results/{dataset_name}/", exist_ok=True)
+        with open(f"results/{dataset_name}/{run.name}.json", "w", encoding="utf-8") as f:
+            json.dump(total_pred, f, indent=1, ensure_ascii=False)
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
+    parser.add_argument("--llm_name", type=str)
     parser.add_argument('--llm_budget', type=int, default=100, help='top k passages for reranking')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')

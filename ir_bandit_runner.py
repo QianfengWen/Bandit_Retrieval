@@ -1,16 +1,13 @@
 import argparse
+import json
 import os
 from collections import defaultdict
 
 import numpy as np
 from tqdm import tqdm
 
-from src.Dataset.dataloader import handle_dataset
-from src.Embedding.embedding import handle_embeddings
 from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k, normalized_dcg_k
-from src.LLM.ChatGPT import ChatGPT
 from src.LLM.llm_utils import handle_llm
-from src.RecUtils.rec_utils import save_results
 from src.Retrieval.retrieval import bandit_retrieval
 
 import wandb
@@ -34,7 +31,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 
     if not args.wandb_disable:
         run = wandb.init(
-            project="bandit_v2",
+            project="bandit_v3",
             config=configs,
             group=args.wandb_group,
         )
@@ -64,6 +61,8 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     rec_k_dict = defaultdict(list)
     map_k_dict = defaultdict(list)
 
+    total_pred = {}
+
     print("=== Bandit Runner ===")
     for i, (query, q_id) in tqdm(enumerate(zip(queries, query_ids)), desc="Query", total=len(queries)):
         items, scores, founds = bandit_retrieval(
@@ -91,6 +90,10 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             update_cache=dataset.cache_path,
         )
         gt = set([p_id for p_id, relevance in relevance_map[q_id].items() if relevance >= dataset.relevance_threshold])
+        total_pred[q_id] = {
+            'gt': list(set),
+            'pred': items
+        }
 
         for k_start in args.cutoff:
             prec_k = precision_k(items, gt, k_start)
@@ -122,10 +125,14 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             updated_dict[new_key] = v
         wandb.log(updated_dict)
 
+        os.makedirs(f"results/{dataset_name}/", exist_ok=True)
+        with open(f"results/{dataset_name}/{run.name}.json", "w", encoding="utf-8") as f:
+            json.dump(total_pred, f, indent=1, ensure_ascii=False)
+
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
-    parser.add_argument("--llm_name", type=str)
+    parser.add_argument("--llm_name", type=str, default='unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit')
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
     parser.add_argument("--use_query", type=int, default=None, help="relevance of query")

@@ -8,7 +8,6 @@ from src.Evaluation.evaluation import precision_k, mean_average_precision_k, rec
 
 from src.Retrieval.retrieval import dense_retrieval
 from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import save_results
 
 import numpy as np
 from tqdm import tqdm

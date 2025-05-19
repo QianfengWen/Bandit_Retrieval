@@ -4,7 +4,9 @@ import os
 import json
 
 from src.Dataset.covid import Covid
+from src.Dataset.fiqa import FiQA
 from src.Dataset.scidocs import Scidocs
+from src.Dataset.scifact import Scifact
 from src.Dataset.touche import Touche
 from src.Dataset.nfcorpus import NfCorpus
 from src.Dataset.dl19 import DL19
@@ -24,6 +26,10 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = NfCorpus(cache_path=cache_path)
     elif dataset_name == 'scidocs':
         dataset = Scidocs(cache_path=cache_path)
+    elif dataset_name == 'scifact':
+        dataset = Scifact(cache_path=cache_path)
+    elif dataset_name == 'fiqa':
+        dataset = FiQA(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset

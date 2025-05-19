@@ -1,3 +1,4 @@
+import unsloth
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 
@@ -5,17 +6,15 @@ import csv
 import os
 import re
 from collections import defaultdict
-
-from tqdm import tqdm
+from filelock import FileLock
 
 from src.LLM.llm import LLM
-
-import torch
 
 
 class Llama(LLM):
     def __init__(self, model_name):
-        self.max_seq_length = 8192  # Choose any! We auto support RoPE Scaling internally!
+        self.max_seq_length = 1024  # Choose any! We auto support RoPE Scaling internally!
+        self.max_gen_length = 32
         dtype = None  # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
         load_in_4bit = True  # Use 4bit quantization to reduce memory usage. Can be False.
 
@@ -51,7 +50,7 @@ Measure how trustworthy the passage is (T).
 Consider the aspects above and the relative importance of each, and decide on a final score (O). Final score must be an integer value only.
 Do not provide any code or in result. Respond only with the final score in the following format:
 ## Final score (O): X
-"""
+""".strip()
 
     ## Likely intent (M): X
     ## Trustworthy (T): X
@@ -60,19 +59,22 @@ Do not provide any code or in result. Respond only with the final score in the f
         pass
 
     def get_score(self, queries, passages, query_ids=None, passage_ids=None, cache=None, update_cache=False):
-        generated_score = {}
+        generated_score = []
         if cache:
             filtered_query, filtered_passages, filtered_query_ids, filtered_passages_ids = [], [], [], []
             for q, p, qid, pid in zip(queries, passages, query_ids, passage_ids):
-                if pid in cache[qid]:
-                  generated_score[(qid, pid)] = cache[qid][pid]
+                if pid in cache.get(qid, {}):
+                  if len(passages) > 1:
+                      raise ValueError ("Batched score should not contain cached output")
+                  else:
+                      return [cache[qid][pid]]
                 else:
                     filtered_query.append(q)
                     filtered_passages.append(p)
                     filtered_query_ids.append(qid)
                     filtered_passages_ids.append(pid)
 
-            queries, passages, query_ids, passages_ids = filtered_query, filtered_passages, filtered_query_ids, filtered_passages_ids
+            queries, passages, query_ids, passage_ids = filtered_query, filtered_passages, filtered_query_ids, filtered_passages_ids
             if len(queries) == 0:
                 return generated_score
         else:
@@ -98,58 +100,53 @@ Do not provide any code or in result. Respond only with the final score in the f
             batch_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True
+            truncation=True,
+            max_length=self.max_seq_length-self.max_gen_length,
         )
+
         batch_inputs = {k: v.to("cuda") for k, v in batch_inputs.items()}
 
         batch_outputs = self.model.generate(
             **batch_inputs,
-            max_new_tokens = 128,
-            use_cache = True,
-            temperature = 1,
-            min_p = 0.1)
+            max_new_tokens = self.max_gen_length,
+            use_cache = False,
+            do_sample=False
+            )
 
-        batch_decoded = self.tokenizer.batch_decode(batch_outputs, skip_special_tokens=False)
+        batch_decoded = self.tokenizer.batch_decode(batch_outputs, skip_special_tokens=True)
 
         new_entries = []
-        for i, decoded in tqdm(enumerate(batch_decoded)):
+        for i, decoded in enumerate(batch_decoded):
             match = re.search(r"(?:##\s*)?final score\s*\(O\)\s*:\s*(\d+)", decoded, re.IGNORECASE)
             if match:
                 score = int(match.group(1))
                 new_entries.append((query_ids[i], passage_ids[i], score))
-                # print(f"\n\n\n\n>> Successful!")
-                # print(f">>> input len: {len(batch_inputs['input_ids'][i])}")
-                # print(f">>> The total output is {decoded}.")
             else:
                 matches = list(re.finditer(r'(?<!\d)([0-3])(?!\d)', decoded))
                 if matches:
                     score = int(matches[-1].group(1))
                     new_entries.append((query_ids[i], passage_ids[i], score))
-                    # print(f"\n\n\n\n>> Successful!")
-                    # print(f">>> input len: {len(batch_inputs['input_ids'][i])}")
-                    # print(f">>> The total output is {decoded}.")
                 else:
                     score = None
                     print(f"\n\n\n\n>> The score was not parsed correctly for query {query_ids[i]} and passage {passage_ids[i]}. ")
-                    # print(f">>> query: {queries[i]}")
-                    # print(f">>> passage: {passages[i]}")
                     print(f">>> input len: {len(batch_inputs['input_ids'][i])}")
                     print(f">>> The total output is {decoded}.")
 
-            generated_score[(query_ids[i], passage_ids[i])] = score
-        print(f"Hit ratio: {len(new_entries)/len(queries)*100:.4f}%")
+            generated_score.append(score)
 
         if update_cache:
             os.makedirs(os.path.dirname(update_cache), exist_ok=True)
             file_exists = os.path.exists(update_cache)
 
-            with open(update_cache, mode='a', newline='', encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
+            lock_path = update_cache + ".lock"
+            with FileLock(lock_path):
+                with open(update_cache, mode='a', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.writer(csvfile)
 
-                if not file_exists:
-                    writer.writerow(["query_id", "passage_id", "score"])
+                    if not file_exists:
+                        writer.writerow(["query_id", "passage_id", "score"])
 
-                writer.writerows(new_entries)
+                    writer.writerows(new_entries)
 
         return generated_score
 

@@ -1,8 +1,6 @@
-import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
 import scipy
-import matplotlib.pyplot as plt
 import time
 AQ_FUNCS = ['ucb', 'random', 'greedy']
 
@@ -55,7 +53,7 @@ class RetrievalGPUCB:
         
         # Setup GP regressor with appropriate kernel: 
         if kernel == "rbf":
-            kernel = C(1.0) * RBF(length_scale=length_scale, length_scale_bounds=(1e-3, 1e2))
+            kernel = C(1.0) * RBF(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2))
         elif kernel == "matern":
             kernel = C(1.0) * Matern(length_scale=length_scale, length_scale_bounds=(1e-3, 1e2), nu=nu)
         elif kernel == 'dot_product':

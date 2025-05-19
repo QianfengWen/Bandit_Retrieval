@@ -32,7 +32,7 @@ class IRDataset(ABC):
                 question_map[query.text] = query.query_id
 
         self.question_sub = sub
-        question_ids = list(question_map.values())
+        question_ids = list(map(str, question_map.values()))
         question_texts = list(question_map.keys())
 
         return question_ids, question_texts
@@ -48,7 +48,7 @@ class IRDataset(ABC):
                 passage_map[passage.text] = passage.doc_id
 
         self.passage_sub = sub
-        passage_ids = list(passage_map.values())
+        passage_ids = list(map(str, passage_map.values()))
         passage_texts = list(passage_map.keys())
 
         return passage_ids, passage_texts
@@ -78,7 +78,7 @@ class IRDataset(ABC):
 
             # Efficient row-wise mapping using zip
             for query_id, doc_id, score in zip(df['query_id'], df['passage_id'], df['score']):
-                prelabel_relevance[str(query_id)][doc_id] = float(score)
+                prelabel_relevance[str(query_id)][str(doc_id)] = float(score)
 
             return prelabel_relevance
         else:
