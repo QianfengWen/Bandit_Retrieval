@@ -1,9 +1,11 @@
 from openai import OpenAI
-from src.LLM.llm import LLM
 from typing import Optional, Union
 from pydantic import BaseModel
 import os, json, csv
 from collections import defaultdict
+
+from src.LLM.llm import LLM
+
 
 class Scores(BaseModel):
     scores: dict[str, int]

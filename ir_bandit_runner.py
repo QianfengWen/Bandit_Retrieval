@@ -6,16 +6,19 @@ from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
 
-from src.Evaluation.evaluation import precision_k, recall_k, mean_average_precision_k, normalized_dcg_k
-from src.LLM.llm_utils import handle_llm
-from src.Retrieval.retrieval import bandit_retrieval
+from src.GPUCB.run_gpucb import bandit_retrieval
+from src.LLM.llm import handle_llm
+
 
 import wandb
-from utils import load_dataset
+from src.metric import precision_k, recall_k, mean_average_precision_k, normalized_dcg_k
+from src.utils import load_dataset
 
 MODE="bandit"
 
 def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, batch_size, args, save_flag=True):
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
     k_retrieval = max(args.cutoff)
     llm = handle_llm(args.llm_name)
 
@@ -40,7 +43,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 
     ################### Load Data ###################
     dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings = (
-        load_dataset(dataset_name, model_name, args.llm_name))
+        load_dataset(base_path, dataset_name, model_name, args.llm_name))
 
     if args.debug:
         print("DEBUG MODE")

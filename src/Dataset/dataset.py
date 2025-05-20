@@ -71,18 +71,21 @@ class IRDataset(ABC):
         return relevance_map
 
     def load_cache(self):
-        print(f"Loading cache file {self.cache_path}")
+        print(f" >>> Loading cache file {self.cache_path}")
         if os.path.exists(self.cache_path):
             df = pd.read_csv(self.cache_path, skipinitialspace=True)
             prelabel_relevance = defaultdict(dict)
 
-            # Efficient row-wise mapping using zip
-            for query_id, doc_id, score in zip(df['query_id'], df['passage_id'], df['score']):
-                prelabel_relevance[str(query_id)][str(doc_id)] = float(score)
-
+            for row in df.itertuples(index=False):
+                qid, pid = str(row.query_id), str(row.passage_id)
+                prelabel_relevance[qid][pid] = {
+                    'er': float(row.er),
+                    'pr': float(row.pr),
+                    'logit': eval(row.logit)
+                }
             return prelabel_relevance
         else:
-            print(f"Cache file {self.cache_path} not found. Creating new cache file.")
+            print(f" >>> Cache file {self.cache_path} not found. Creating new cache file.")
             return defaultdict(dict)
 
     def load_data(self):

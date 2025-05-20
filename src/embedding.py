@@ -4,9 +4,6 @@ import torch
 import os
 from sentence_transformers import SentenceTransformer
 
-def add_eos(input_examples, model):
-  input_examples = [input_example + model.tokenizer.eos_token for input_example in input_examples]
-  return input_examples
 
 def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size=32):
     print(model_name)
@@ -19,6 +16,7 @@ def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_p
         query_prompt = "query"
     else:
         query_prompt = None
+
     print("Encoding queries..")
     query_embeddings = embedder.encode(query_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size, prompt=query_prompt)
     query_embeddings = query_embeddings.to('cpu')
@@ -56,9 +54,9 @@ def load_embeddings(query_embeddings_path, passage_embeddings_path):
 def handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path, query_texts, passage_texts, batch_size=32):
 
     if model_name and os.path.exists(query_embeddings_path) and os.path.exists(passage_embeddings_path):
-        print("The embeddings already exist.")
+        print(" >>> The embeddings already exist.")
         return load_embeddings(query_embeddings_path, passage_embeddings_path)
     else:
-        print("The embeddings do not exist.")
-        print(f"Creating embeddings for {model_name}")
+        print(" >>> The embeddings do not exist.")
+        print(f" >>>Creating embeddings for {model_name}")
         return create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size)

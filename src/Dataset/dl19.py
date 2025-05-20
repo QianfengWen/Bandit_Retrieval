@@ -1,4 +1,4 @@
-from src.Dataset.ir_dataset import IRDataset
+from src.Dataset.dataset import IRDataset
 
 
 class DL19(IRDataset):

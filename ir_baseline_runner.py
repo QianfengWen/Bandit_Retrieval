@@ -2,12 +2,12 @@ import argparse
 import os
 
 import wandb
+from src.Baseline import dense_retrieval
 
-from src.Dataset.dataloader import handle_dataset
+from src.Dataset.ir_dataset import handle_dataset
 from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
 
-from src.Retrieval.retrieval import dense_retrieval
-from src.Embedding.embedding import handle_embeddings
+from src.embedding import handle_embeddings
 
 import numpy as np
 from tqdm import tqdm
@@ -42,7 +42,7 @@ def main(dataset_name, model_name, args, save_flag=True):
     dataset = handle_dataset(dataset_name)
     query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
     print("Loading embeddings...")
-    query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
+    query_embeddings, passage_embeddings = handle_embeddings(base_path, model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages, batch_size=args.batch_size)
 
 

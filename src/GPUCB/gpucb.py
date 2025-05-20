@@ -33,7 +33,7 @@ class CosineSimilarityKernel(NormalizedKernelMixin, Kernel):
 
 
 random_seed = 42   
-class RetrievalGPUCB:
+class GPUCB:
     """
     GP-UCB implementation specifically for retrieval tasks.
     """
@@ -83,8 +83,8 @@ class RetrievalGPUCB:
             if self.acquisition_function == 'ucb':
                 self.beta = beta
             else:
-                self.beta = 0
-    
+                self.beta = 0.0
+
     def update(self, x, reward):
         """
         Update the GP model with a new observation

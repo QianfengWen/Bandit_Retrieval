@@ -3,22 +3,22 @@ import json
 import os
 
 import wandb
+from src.Baseline import llm_rerank
 
-from src.Dataset.dataloader import handle_dataset
 from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
 
-from src.Retrieval.retrieval import llm_rerank
-from src.Embedding.embedding import handle_embeddings
 
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
 
-from utils import load_dataset
+from src.utils import load_dataset
 
 MODE="llm_reranking"
 
 def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
     configs = dict(vars(args))
     configs['runner'] = MODE
 
@@ -32,7 +32,7 @@ def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
         run = None
 
     dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings = (
-        load_dataset(dataset_name, model_name, args.llm_name))
+        load_dataset(base_path, dataset_name, model_name, args.llm_name))
 
 
 
