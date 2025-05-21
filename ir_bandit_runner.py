@@ -135,6 +135,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
+
     parser.add_argument("--llm_name", type=str, default='unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit')
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
@@ -161,5 +162,6 @@ def arg_parser():
 
 if __name__ == "__main__":
     args = arg_parser()
+    # TODO: add seed
     main(dataset_name=args.dataset_name, model_name=args.emb_model, acq_func=args.acq_func, beta=args.beta,
          llm_budget=args.llm_budget, k_cold_start=args.cold_start, kernel=args.kernel, batch_size=args.batch_size, args=args)

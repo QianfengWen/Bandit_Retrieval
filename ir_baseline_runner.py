@@ -55,7 +55,7 @@ def main(dataset_name, model_name, args, save_flag=True):
 
     print("=== Dense Retrieval ===")
     for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc="Query", total=len(query_ids)):
-        items, scores = dense_retrieval(passage_ids, passage_embeddings, query_embedding, k_retrieval = k_retrieval, return_score=True)
+        items, scores = dense_retrieval(passage_ids, passage_embeddings, query_embedding, top_k_passages= k_retrieval, return_score=True)
         gt = set([p_id for p_id, relevance in relevance_map[q_id].items() if relevance >= dataset.relevance_threshold])
 
         for k_start in args.cutoff:

@@ -1,57 +1,35 @@
 import os
+import random
 
 import numpy as np
-from src.Dataset.covid import Covid
-from src.Dataset.fiqa import FiQA
-from src.Dataset.scidocs import Scidocs
-from src.Dataset.scifact import Scifact
-from src.Dataset.touche import Touche
-from src.Dataset.nfcorpus import NfCorpus
-from src.Dataset.dl19 import DL19
-from src.Dataset.dl20 import DL20
-from src.LLM.chatgpt import ChatGPT
-from src.LLM.llama import Llama
+import torch
+
+from src.Dataset.factory import handle_dataset
 from src.embedding import handle_embeddings
 
 
-def calculate_cosine_similarity(query_embeddings, passage_embeddings):
+def cosine_similarity(query_embeddings, passage_embeddings):
     return np.dot(query_embeddings, passage_embeddings.T)
 
+def seed_everything(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if using multi-GPU
 
-def handle_llm(llm_name, prompt_type=None):
-    if llm_name is None:
-        raise NotImplementedError ("No LLM name provided")
-        llm = ChatGPT(api_key=os.getenv("OPENAI_API_KEY"))
-    elif "chatgpt" in llm_name.lower():
-        raise NotImplementedError ("ChatGPT is not supported in this version")
-        llm = ChatGPT(api_key=os.getenv("CHATGPT_API_KEY"))
-    elif "llama" in llm_name.lower():
-         llm = Llama(model_name=llm_name, prompt_type=prompt_type)
-    else:
-        raise Exception(f"Unknown llm name: {llm_name}")
-    return llm
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
+    # Ensure deterministic behavior in cuDNN
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-def handle_dataset(dataset_name, cache_path=None):
-    if dataset_name == "covid":
-        dataset = Covid(cache_path=cache_path)
-    elif dataset_name == "touche":
-        dataset = Touche(cache_path=cache_path)
-    elif dataset_name == 'dl19':
-        dataset = DL19(cache_path=cache_path)
-    elif dataset_name == 'dl20':
-        dataset = DL20(cache_path=cache_path)
-    elif dataset_name == 'nfcorpus':
-        dataset = NfCorpus(cache_path=cache_path)
-    elif dataset_name == 'scidocs':
-        dataset = Scidocs(cache_path=cache_path)
-    elif dataset_name == 'scifact':
-        dataset = Scifact(cache_path=cache_path)
-    elif dataset_name == 'fiqa':
-        dataset = FiQA(cache_path=cache_path)
-    else:
-        raise ValueError(f"Invalid dataset name: {dataset_name}")
-    return dataset
+    # Set seed for Huggingface transformers (if available)
+    try:
+        from transformers import set_seed
+        set_seed(seed)
+    except ImportError:
+        pass
 
 
 def load_dataset(base_path, dataset_name, model_name, llm_name, prompt_type):

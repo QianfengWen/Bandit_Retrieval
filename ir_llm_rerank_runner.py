@@ -5,97 +5,68 @@ import os
 import wandb
 from src.Baseline import llm_rerank
 
-from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
 
-
-import numpy as np
 from tqdm import tqdm
-from collections import defaultdict
 
-from src.utils import load_dataset
+from src.evaluate import evaluate
+from src.utils import load_dataset, seed_everything
 
 MODE="llm_reranking"
 
-def main(dataset_name, model_name, top_k_passages, args, save_flag=True):
-    base_path = os.path.dirname(os.path.abspath(__file__))
-
-    configs = dict(vars(args))
-    configs['runner'] = MODE
-
+def main(dataset_name, model_name, top_k_passages, args):
     if not args.wandb_disable:
+        configs = dict(vars(args))
+        configs['runner'] = MODE
         run = wandb.init(
-            project="bandit_v3",
+            project="bandit_v4",
             config=configs,
             group=args.wandb_group,
         )
     else:
         run = None
 
+    base_path = os.path.dirname(os.path.abspath(__file__))
     dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings = (
-        load_dataset(base_path, dataset_name, model_name, args.llm_name))
+        load_dataset(base_path, dataset_name, model_name, args.llm_name, args.prompt_type))
 
+    print("\n")
+    output = {}
+    for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc=" > LLM Reranking", total=len(query_ids)):
+        pred, _ = llm_rerank(
+            query_id=q_id,
+            query_embedding=query_embedding,
+            passage_ids=passage_ids,
+            passage_embeddings=passage_embeddings,
+            top_k_passages=top_k_passages,
+            score_type=args.score_type,
+            cache=cache,
+        )
+        output[q_id] = pred
 
-
-    ################### Evaluation ###################
-    k_retrieval = top_k_passages
-    ndcg_k_dict = defaultdict(list)
-    prec_k_dict = defaultdict(list)
-    rec_k_dict = defaultdict(list)
-    map_k_dict = defaultdict(list)
-
-    total_pred = {}
-
-    print("=== LLM Reranking ===")
-    for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc="Reranking", total=len(query_ids)):
-        items = llm_rerank(passage_ids, passage_embeddings, query_embedding, q_id, k_retrieval=k_retrieval, cache=cache, return_score=False)
-        gt = set([p_id for p_id, relevance in relevance_map[q_id].items() if relevance >= dataset.relevance_threshold])
-        total_pred[q_id] = {
-            'gt': list(gt),
-            'pred': items
-        }
-
-        for k_start in args.cutoff:
-            prec_k = precision_k(items, gt, k_start)
-            rec_k = recall_k(items, gt, k_start)
-            map_k = mean_average_precision_k(items, gt, k_start)
-            ndcg_k = normalized_dcg_k(items, relevance_map[q_id], k_start)
-
-            prec_k_dict[k_start].append(prec_k)
-            rec_k_dict[k_start].append(rec_k)
-            map_k_dict[k_start].append(map_k)
-            ndcg_k_dict[k_start].append(ndcg_k)
-
-    results = {}
-    for k in prec_k_dict.keys():
-        print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
-        print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
-        print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
-        print(f"NDCG@{k}: {np.mean(ndcg_k_dict[k])}\n")
-
-        results[f"precision@{k}"] = np.mean(prec_k_dict[k]).round(4)
-        results[f"recall@{k}"] = np.mean(rec_k_dict[k]).round(4)
-        results[f"map@{k}"] = np.mean(map_k_dict[k]).round(4)
-        results[f"ndcg@{k}"] = np.mean(ndcg_k_dict[k]).round(4)
+    cutoff = [int(k) for k in args.cutoff if int(k) <= top_k_passages]
+    metric, results = evaluate(output, relevance_map, cutoff, threshold=dataset.relevance_threshold)
 
     if run is not None:
         updated_dict = {}
-        for k, v in results.items():
+        for k, v in metric.items():
             new_key = str(k).replace("@", "/")
             updated_dict[new_key] = v
         wandb.log(updated_dict)
 
         os.makedirs(f"results/{dataset_name}/", exist_ok=True)
         with open(f"results/{dataset_name}/{run.name}.json", "w", encoding="utf-8") as f:
-            json.dump(total_pred, f, indent=1, ensure_ascii=False)
+            json.dump(results, f, indent=1, ensure_ascii=False)
 
 def arg_parser():
-    parser = argparse.ArgumentParser(description='IR-based baseline')
+    parser = argparse.ArgumentParser(description='Reranking with LLM')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
     parser.add_argument("--llm_name", type=str)
     parser.add_argument('--llm_budget', type=int, default=100, help='top k passages for reranking')
+    parser.add_argument("--prompt_type", type=str, choices=['zeroshot', 'fewshot'])
+    parser.add_argument("--score_type", type=str, choices=['er', 'pr'], default='er')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
-    parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
+    parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 5, 10, 50, 100, 1000])
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
     parser.add_argument("--wandb_group", type=str, default="llm_rerank", help="wandb group")
@@ -105,4 +76,5 @@ def arg_parser():
 
 if __name__ == "__main__":
     args = arg_parser()
+    seed_everything()
     main(dataset_name=args.dataset_name, model_name=args.emb_model, top_k_passages=args.llm_budget, args=args)

@@ -4,15 +4,13 @@ import os
 import numpy as np
 from tqdm import tqdm
 import wandb
+from src.LLM.factory import handle_llm
 
-from src.utils import load_dataset, calculate_cosine_similarity, handle_llm
+from src.utils import load_dataset, cosine_similarity, seed_everything
 
 
 def main(dataset_name, model_name, top_k, args):
     verbose = False
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    ################### Load Data ###################
-
     config = dict(vars(args))
     config['runner'] = 'label'
     wandb.init(
@@ -20,12 +18,14 @@ def main(dataset_name, model_name, top_k, args):
         config=config,
         name=f"{dataset_name}_{args.prompt_type}_{args.part}/{args.total}",
     )
+
+    base_path = os.path.dirname(os.path.abspath(__file__))
     dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings =(
         load_dataset(base_path, dataset_name, model_name, args.llm_name, args.prompt_type))
 
 
     if args.total is not None and args.part is not None:
-        print(f"\n\n> {args.part}th part in total: {args.total}")
+        print(f"\n\n> {args.part}th part in total {args.total} part")
         start = len(queries) // args.total * (args.part-1)
         end = len(queries) // args.total * args.part
         print(f"> Starting in index {start} to {end}")
@@ -38,9 +38,9 @@ def main(dataset_name, model_name, top_k, args):
     hit, total = 0, 0
 
     print("\n")
-    for q_id, query, query_embedding in tqdm(zip(query_ids, queries, query_embeddings), desc="Labeling with LLM",
+    for q_id, query, query_embedding in tqdm(zip(query_ids, queries, query_embeddings), desc=" > Labeling with LLM",
                                              total=len(queries)):
-        sim_matrx = calculate_cosine_similarity(query_embedding, passage_embeddings)
+        sim_matrx = cosine_similarity(query_embedding, passage_embeddings)
         sorted_indices = np.argsort(sim_matrx)[::-1][:top_k]
         sorted_passages = [(passage_ids[i], passages[i]) for i in sorted_indices if passage_ids[i] not in cache[q_id]]
         total += top_k
@@ -67,7 +67,7 @@ def main(dataset_name, model_name, top_k, args):
 
 
 def arg_parser():
-    parser = argparse.ArgumentParser(description='IR-based baseline')
+    parser = argparse.ArgumentParser(description='Labeling with LLM')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
     parser.add_argument("--part", type=int)
     parser.add_argument("--total", type=int)
@@ -85,4 +85,5 @@ def arg_parser():
 
 if __name__ == "__main__":
     args = arg_parser()
+    seed_everything()
     main(dataset_name=args.dataset_name, model_name=args.emb_model, top_k=args.top_k, args=args)

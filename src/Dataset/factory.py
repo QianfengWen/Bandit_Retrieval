@@ -1,0 +1,30 @@
+from src.Dataset.covid import Covid
+from src.Dataset.dl19 import DL19
+from src.Dataset.dl20 import DL20
+from src.Dataset.fiqa import FiQA
+from src.Dataset.nfcorpus import NfCorpus
+from src.Dataset.scidocs import Scidocs
+from src.Dataset.scifact import Scifact
+from src.Dataset.touche import Touche
+
+
+def handle_dataset(dataset_name, cache_path=None):
+    if dataset_name == "covid":
+        dataset = Covid(cache_path=cache_path)
+    elif dataset_name == "touche":
+        dataset = Touche(cache_path=cache_path)
+    elif dataset_name == 'dl19':
+        dataset = DL19(cache_path=cache_path)
+    elif dataset_name == 'dl20':
+        dataset = DL20(cache_path=cache_path)
+    elif dataset_name == 'nfcorpus':
+        dataset = NfCorpus(cache_path=cache_path)
+    elif dataset_name == 'scidocs':
+        dataset = Scidocs(cache_path=cache_path)
+    elif dataset_name == 'scifact':
+        dataset = Scifact(cache_path=cache_path)
+    elif dataset_name == 'fiqa':
+        dataset = FiQA(cache_path=cache_path)
+    else:
+        raise ValueError(f"Invalid dataset name: {dataset_name}")
+    return dataset
