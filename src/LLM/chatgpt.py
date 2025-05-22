@@ -18,7 +18,7 @@ response_format = {
     }
 }
 
-class ChatGPT(LLM):
+class ChatGPT():
     """
     GPT Chat Completion using OpenAI API
     """

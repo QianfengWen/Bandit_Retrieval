@@ -73,7 +73,7 @@ def arg_parser():
     parser.add_argument("--total", type=int)
 
     parser.add_argument("--llm_name", type=str, help="LLM name, default is ChatGPT")
-    parser.add_argument("--prompt_type", type=str, choices=['zeroshot', 'fewshot'])
+    parser.add_argument("--prompt_type", type=str)
     parser.add_argument("--score_type", type=str, choices=['er', 'pr'], default='er')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')

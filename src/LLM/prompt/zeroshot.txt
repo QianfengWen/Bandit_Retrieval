@@ -14,6 +14,6 @@ Consider the underlying intent of the search.
 Measure how well the content matches a likely intent of the query (M).
 Measure how trustworthy the passage is (T).
 Consider the aspects above and the relative importance of each, and decide on a final score (O). Final score must be an integer value only.
-Do not provide any code or in result. Provide only the score without any explanation.
+Do not provide any code or reasoning in result. Provide only the score without any explanation.
 
 ##final score:
