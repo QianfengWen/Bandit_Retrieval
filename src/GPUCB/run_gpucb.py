@@ -1,7 +1,8 @@
-from random import random
-
+import random
 import numpy as np
 from tqdm import tqdm
+
+from sklearn.preprocessing import normalize
 
 from src.GPUCB.gpucb import GPUCB
 from src.LLM.llm import LLM
@@ -24,9 +25,11 @@ def bandit_retrieval(
         length_scale=1,
         nu=2.5,
         acq_func="ucb",
+        normalize_passage=False,
+        ard=False,
         k_retrieval: int = 1000,
         kernel: str = "rbf",
-        batch_size: int = 10,
+        batch_size: int = 1,
         verbose: bool = False,
         return_score: bool = False,
         cache: dict = None,
@@ -37,10 +40,20 @@ def bandit_retrieval(
         raise ValueError("LLM budget must be at least 1")
 
     k_cold_start = min(k_cold_start, llm_budget)
+    if ard:
+        length_scale = [length_scale] * passage_embeddings.shape[1]
 
     gpucb = GPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, acquisition_function=acq_func,
                   nu=nu)  # set up GP-UCB
+
+    if normalize_passage:
+        org_passage_embeddings = passage_embeddings.copy()
+        passage_embeddings = normalize(passage_embeddings, norm='l2')
+    else:
+        org_passage_embeddings = passage_embeddings
+
     if use_query is not None:
+        raise NotImplementedError("use_query with normalization is not implemented yet")
         gpucb.update(query_embedding, use_query)
 
     available_ids = passage_ids.copy()
@@ -50,7 +63,7 @@ def bandit_retrieval(
     scores = {}
 
     ############### Cold start ################
-    cosine_similairty_matrix = cosine_similarity(query_embedding, passage_embeddings)
+    cosine_similairty_matrix = cosine_similarity(query_embedding, org_passage_embeddings)
     if query_embedding is not None and k_cold_start > 0:
         cold_start_idx = np.argsort(cosine_similairty_matrix)[::-1][:k_cold_start]
         cold_start_ids = [passage_ids[idx] for idx in cold_start_idx]
@@ -71,7 +84,7 @@ def bandit_retrieval(
             batch_passages = [passages[idx] for idx in passage_idxs]
 
             # get relevance scores for the batch using LLM
-            batch_scores = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=batch, cache=cache,
+            batch_scores, _ = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=batch, cache=cache,
                                          update_cache=update_cache)
 
             # store observations
@@ -113,7 +126,7 @@ def bandit_retrieval(
         passage_idxs = [passage_ids.index(next_id) for next_id in next_ids]
         batch_passages = [passages[idx] for idx in passage_idxs]
 
-        batch_scores = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=next_ids, cache=cache,
+        batch_scores, _ = llm.get_score(query, batch_passages, query_ids=[query_id], passage_ids=next_ids, cache=cache,
                                      update_cache=update_cache)
 
         for next_id, score in zip(next_ids, batch_scores):

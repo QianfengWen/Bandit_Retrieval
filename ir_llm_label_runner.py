@@ -34,7 +34,7 @@ def main(dataset_name, model_name, top_k, args):
         query_ids = query_ids[start:end]
         query_embeddings = query_embeddings[start:end]
 
-    llm = handle_llm(llm_name=args.llm_name, prompt_type=args.prompt_type)
+    llm = handle_llm(llm_name=args.llm_name, prompt_type=args.prompt_type, score_type=args.score_type)
     hit, total = 0, 0
 
     print("\n")

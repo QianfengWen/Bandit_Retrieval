@@ -14,7 +14,8 @@ class LLM(abc.ABC):
     """
     Abstract class for Language Model (LLM)
     """
-    def __init__(self, model_name, prompt_type=None, max_seq_length=None):
+    def __init__(self, model_name, prompt_type=None, score_type=None, max_seq_length=None):
+        self.score_type = score_type
         self.label2idx = None
         self.label2weight = torch.tensor([0, 1, 2, 3])
 
@@ -28,7 +29,7 @@ class LLM(abc.ABC):
             elif prompt_type == 'rg4l':
                 self.max_seq_length = 1024
             else:
-                raise ValueError("prompt_type should be either 'fewshot' or 'zeroshot'")
+                raise ValueError("Unknown prompt type: {}".format(prompt_type))
         else:
             self.max_seq_length = max_seq_length
 
@@ -58,8 +59,7 @@ class LLM(abc.ABC):
             query_ids: list[int],
             passage_ids: list[int],
             cache:dict=None,
-            update_cache:str=False,
-            score_type:str='er'):
+            update_cache:str=False):
 
         """
         Get the relevance score of each passage for a given query using a single LLM call.
@@ -70,12 +70,11 @@ class LLM(abc.ABC):
             passage_ids: A list of IDs for the passages.
             cache: A dictionary of cached results.
             update_cache: Path to the CSV file to update with new results. If provided, the results will be written to the CSV file.
-            score_type: The type of score to return. Options are 'er' (expected relevance) or 'pr' (peack relevance).
         """
         if cache and (len(queries) == 1) and (len(passages) == 1):
             qid, pid = query_ids[0], passage_ids[0]
             if pid in cache.get(qid, {}):
-                return [cache[qid][pid][score_type]], [logit2entropy(cache[qid][pid]['logit'])]
+                return [cache[qid][pid][self.score_type]], [logit2entropy(cache[qid][pid]['logit'])]
 
         batch_qps = [(q, p) for q, p in zip(queries, passages)]
         logit = self.get_logit(batch_qps)
@@ -103,9 +102,9 @@ class LLM(abc.ABC):
 
                     writer.writerows(new_entries)
 
-        if score_type=='er':
+        if self.score_type=='er':
             return er_scores, entropy
-        elif score_type=='pr':
+        elif self.score_type=='pr':
             return pr_scores, entropy
         else:
             raise ValueError("score_type should be either 'er' or 'pr'")

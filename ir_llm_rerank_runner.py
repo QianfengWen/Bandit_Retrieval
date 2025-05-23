@@ -30,7 +30,7 @@ def main(dataset_name, model_name, top_k_passages, args):
         load_dataset(base_path, dataset_name, model_name, args.llm_name, args.prompt_type))
 
     print("\n")
-    output = {}
+    results = {}
     for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc=" > LLM Reranking", total=len(query_ids)):
         pred, _ = llm_rerank(
             query_id=q_id,
@@ -41,10 +41,10 @@ def main(dataset_name, model_name, top_k_passages, args):
             score_type=args.score_type,
             cache=cache,
         )
-        output[q_id] = pred
+        results[q_id] = {"pred": pred}
 
     cutoff = [int(k) for k in args.cutoff if int(k) <= top_k_passages]
-    metric, results = evaluate(output, relevance_map, cutoff, threshold=dataset.relevance_threshold)
+    metric, results = evaluate(results, relevance_map, cutoff, threshold=dataset.relevance_threshold)
 
     if run is not None:
         updated_dict = {}

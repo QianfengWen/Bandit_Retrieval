@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 
 
-def evaluate(predictions:dict, relevance_map, cutoff:list[int], threshold:int):
+def evaluate(results:dict, relevance_map, cutoff:list[int], threshold:int):
     """
     Evaluate the performance of the model using various metrics.
     :param total_items: list of retrieved items
@@ -16,15 +16,11 @@ def evaluate(predictions:dict, relevance_map, cutoff:list[int], threshold:int):
     map_k_dict = defaultdict(list)
     mrr_k_dict = defaultdict(list)
 
-    results = {}
-    for q_id, pred in predictions.items():
+    for q_id, result in results.items():
+        pred = result['pred']
         relevance = relevance_map[q_id]
         gt = set([p_id for p_id, rel in relevance.items() if rel >= threshold])
-
-        results[q_id] = {
-            'pred': pred,
-            'gt': list(gt),
-        }
+        results[q_id]['gt'] = list(gt)
 
         for k in cutoff:
             if len(gt) == 0:
