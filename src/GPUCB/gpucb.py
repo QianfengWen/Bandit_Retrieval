@@ -1,11 +1,12 @@
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, RationalQuadratic, ExpSineSquared, DotProduct
 import scipy
-import time
-AQ_FUNCS = ['ucb', 'random', 'greedy']
 
 from sklearn.gaussian_process.kernels import Kernel, NormalizedKernelMixin
 import numpy as np
+
+from src.GPUCB.onlinescaler import OnlineScaler
+
 
 class CosineSimilarityKernel(NormalizedKernelMixin, Kernel):
     def __init__(self):
@@ -31,8 +32,12 @@ class CosineSimilarityKernel(NormalizedKernelMixin, Kernel):
     def is_stationary(self):
         return False
 
+def optimizer(obj_func, x0, bounds):
+    res = scipy.optimize.minimize(
+        obj_func, x0, bounds=bounds, method="L-BFGS-B", jac=True,
+        options={'maxiter': 100})
+    return res.x, res.fun
 
-random_seed = 42   
 class GPUCB:
     """
     GP-UCB implementation specifically for retrieval tasks.
@@ -48,7 +53,7 @@ class GPUCB:
         if kernel == "rbf":
             kernel = C(1.0) * RBF(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2))
         elif kernel == "matern":
-            kernel = C(1.0) * Matern(length_scale=length_scale, length_scale_bounds=(1e-3, 1e2), nu=nu)
+            kernel = C(1.0) * Matern(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2), nu=nu)
         elif kernel == 'dot_product':
             kernel = C(1.0) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e5))
         elif kernel == 'cosine_similarity':
@@ -56,26 +61,18 @@ class GPUCB:
         else:
             raise ValueError("Invalid kernel specified.")
 
-        def optimizer(obj_func, x0, bounds):
-            res = scipy.optimize.minimize(
-                obj_func, x0, bounds=bounds, method="L-BFGS-B", jac=True,
-                options={'maxiter': 100})
-            return res.x, res.fun
-            
+        self.beta = beta
+        self.acquisition_function = acquisition_function
+        self.y_scaler = OnlineScaler()
+
         self.gp = GaussianProcessRegressor(
             kernel=kernel,
             alpha=alpha,
-            normalize_y=True,
+            normalize_y=False,
             n_restarts_optimizer=10,
             optimizer=optimizer
         )
 
-        if acquisition_function in AQ_FUNCS:
-            self.acquisition_function = acquisition_function
-            if self.acquisition_function == 'ucb':
-                self.beta = beta
-        else:
-            raise ValueError(f"Invalid acquisition function: {acquisition_function}. ")
 
     def update(self, x, reward):
         """
@@ -86,7 +83,9 @@ class GPUCB:
             reward: The observed reward (relevance score)
         """
         self.X.append(x)  # Add the flattened array
-        self.y.append(float(reward))
+        self.y_scaler.update(float(reward))
+        scaled_y = self.y_scaler.scale(reward)
+        self.y.append(scaled_y)  # Add the scaled reward
         # Mark that model needs refitting after new data
         self.is_fitted = False
     
@@ -173,6 +172,8 @@ class GPUCB:
         mu, sigma = self.get_mean_std(candidates)
         sorted_indices = np.argsort(-mu)[:k]
         top_k_scores = mu[sorted_indices]
+        if return_scores:
+            top_k_scores = self.y_scaler.restore(top_k_scores)
 
         if return_scores:
             return sorted_indices, top_k_scores
