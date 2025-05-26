@@ -2,6 +2,7 @@ import os
 import random
 
 import numpy as np
+import sklearn
 import torch
 
 from src.Dataset.factory import handle_dataset
@@ -9,7 +10,12 @@ from src.embedding import handle_embeddings
 
 
 def cosine_similarity(query_embeddings, passage_embeddings):
-    return np.dot(query_embeddings, passage_embeddings.T)
+    if query_embeddings.ndim == 1:
+        query_embeddings = query_embeddings.reshape(1, -1)
+    query_norm = query_embeddings / np.linalg.norm(query_embeddings, axis=1, keepdims=True)
+    passage_norm = passage_embeddings / np.linalg.norm(passage_embeddings, axis=1, keepdims=True)
+    similarity_matrix = np.dot(query_norm, passage_norm.T)
+    return similarity_matrix.flatten()
 
 def seed_everything(seed: int = 42):
     random.seed(seed)
@@ -17,6 +23,8 @@ def seed_everything(seed: int = 42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # if using multi-GPU
+    sklearn.utils.check_random_state(seed)
+
 
     os.environ["PYTHONHASHSEED"] = str(seed)
 

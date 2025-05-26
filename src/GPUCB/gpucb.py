@@ -39,13 +39,6 @@ class GPUCB:
     """
     
     def __init__(self, beta=2.0, kernel='rbf', alpha=1e-3, length_scale=1, acquisition_function='ucb', nu=2.5):
-        """
-        Initialize the GP-UCB algorithm for retrieval
-        
-        Args:
-            beta: Exploration parameter that balances exploitation vs exploration
-            is_embeddings_based: Whether to use embeddings (True) or indices (False) as features
-        """
         self.is_fitted = False
         # Observations
         self.X = []  # Features of observed points (indices or embeddings)
@@ -71,10 +64,9 @@ class GPUCB:
             
         self.gp = GaussianProcessRegressor(
             kernel=kernel,
-            alpha=alpha,  # Small noise to avoid numerical issues
+            alpha=alpha,
             normalize_y=True,
             n_restarts_optimizer=10,
-            random_state=42,
             optimizer=optimizer
         )
 
@@ -82,8 +74,8 @@ class GPUCB:
             self.acquisition_function = acquisition_function
             if self.acquisition_function == 'ucb':
                 self.beta = beta
-            else:
-                self.beta = 0.0
+        else:
+            raise ValueError(f"Invalid acquisition function: {acquisition_function}. ")
 
     def update(self, x, reward):
         """
@@ -93,41 +85,11 @@ class GPUCB:
             x: The feature of the selected candidate (index or embedding)
             reward: The observed reward (relevance score)
         """
-        x_processed = self._process_x(x)
-        self.X.append(x_processed)  # Add the flattened array
-        self.y.append(reward)
+        self.X.append(x)  # Add the flattened array
+        self.y.append(float(reward))
         # Mark that model needs refitting after new data
         self.is_fitted = False
     
-    def _process_x(self, candidates):
-        """
-        Process candidates into appropriate format for GP
-        
-        Args:
-            candidates: List of candidates (indices or embeddings), already a numpy array
-            
-        Returns:
-            Numpy array of processed candidates
-        """
-        # convert to numpy array if not already):
-        if not isinstance(candidates, np.ndarray):
-            candidates = np.array(candidates)
-        
-        # Ensure proper dimensionality (2D: samples × features)
-        if candidates.ndim == 1:
-            # If 1D, add a dimension to make it 2D
-            candidates = candidates.reshape(1, -1)
-            
-        return candidates
-    
-    def _process_candidates(self, candidates):
-        if isinstance(candidates, list):
-            candidates = np.array(candidates)
-
-        if candidates.ndim == 1:
-            candidates = candidates.reshape(-1, 1)
-        return candidates
-            
 
     def get_mean_std(self, candidates):
         """
@@ -143,16 +105,13 @@ class GPUCB:
         if not self.X:
             # If no observations, return default values
             return np.zeros(len(candidates)), np.ones(len(candidates))
-        
-        # Convert candidates to appropriate format
-        X_candidates = self._process_candidates(candidates)
-        
+
         # Fit GP model only if it hasn't been fitted since last update
         if not self.is_fitted:
             # Ensure proper X format for fitting
             X_train = np.stack(self.X)
             if X_train.ndim != 1:
-                X_train = X_train.reshape(-1, X_candidates.shape[1])
+                X_train = X_train.reshape(-1, candidates.shape[1])
             if X_train.ndim == 1:
                 X_train = X_train.reshape(-1, 1)
             
@@ -160,7 +119,7 @@ class GPUCB:
             self.is_fitted = True
         
         # Predict mean and standard deviation
-        mu, sigma = self.gp.predict(X_candidates, return_std=True)
+        mu, sigma = self.gp.predict(candidates, return_std=True)
         
         return mu, sigma
 
@@ -180,30 +139,23 @@ class GPUCB:
             return np.arange(min(n, len(candidates)))
         
         if self.acquisition_function == 'random':
-            # Random selection for comparison
-            np.random.seed(random_seed)
             return np.random.choice(len(candidates), n, replace=False)
-        
-        # Convert candidates to appropriate format
-        X_candidates = self._process_candidates(candidates)
         
         # Fit GP model only if it hasn't been fitted since last update
         if not self.is_fitted:
             # Ensure proper X format for fitting
-            X_train = np.stack(self.X)
-            if X_train.ndim != 1:
-                X_train = X_train.reshape(-1, X_candidates.shape[1])
-            if X_train.ndim == 1:
-                X_train = X_train.reshape(-1, 1)
+            x_train = np.stack(self.X)
+            if x_train.ndim != 1:
+                x_train = x_train.reshape(-1, candidates.shape[1])
+            if x_train.ndim == 1:
+                x_train = x_train.reshape(-1, 1)
                 
             # Fit the model
-            start = time.time()
-            self.gp.fit(X_train, np.array(self.y))
-            end = time.time()
+            self.gp.fit(x_train, np.array(self.y))
             self.is_fitted = True
         
         # Predict mean and standard deviation for all candidates
-        mu, sigma = self.gp.predict(X_candidates, return_std=True)
+        mu, sigma = self.gp.predict(candidates, return_std=True)
         
         # Calculate upper confidence bound
         ucb = mu + np.sqrt(self.beta) * sigma

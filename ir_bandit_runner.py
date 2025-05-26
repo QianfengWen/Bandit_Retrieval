@@ -14,8 +14,8 @@ from src.utils import load_dataset, seed_everything
 
 MODE="bandit"
 
-def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, args, save_flag=True):
-    if args.acq_func != "bandit":
+def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, args):
+    if args.acq_func != "ucb":
         raise NotImplementedError
     if not args.wandb_disable:
         configs = dict(vars(args))
@@ -33,16 +33,14 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         load_dataset(base_path, dataset_name, model_name, args.llm_name, args.prompt_type))
 
     if args.debug:
-        print("DEBUG MODE")
+        print("\n > DEBUG MODE")
         query_ids = query_ids[:1]
         queries = queries[:1]
-        print(f"Query IDs: {query_ids}")
-        print(f"Queries: {queries}")
+        print(f" >> Query IDs: {query_ids}")
+        print(f" >> Queries: {queries}")
+
         llm_budget = 10
         k_cold_start = 5
-        verbose = True
-    else:
-        verbose = False
 
     k_retrieval = max(args.cutoff)
     llm = handle_llm(args.llm_name,args.prompt_type,args.score_type)
@@ -51,14 +49,13 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     results = {}
     for i, (query, q_id) in tqdm(enumerate(zip(queries, query_ids)), desc=" > Bandit Ranking", total=len(queries)):
         preds, scores, founds = bandit_retrieval(
-            passage_ids=passage_ids.copy(),
-            passage_embeddings=passage_embeddings,
-            passages=passages,
             llm=llm,
             query=query,
-            query_embedding=query_embeddings[i],
             query_id=q_id,
-
+            query_embedding=query_embeddings[i],
+            passages=passages,
+            passage_ids=passage_ids.copy(),
+            passage_embeddings=passage_embeddings,
             use_query=args.use_query,
             alpha=args.alpha,
             beta=beta,
@@ -72,7 +69,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             llm_budget=llm_budget,
             k_cold_start=k_cold_start,
             k_retrieval=k_retrieval,
-            verbose=verbose,
+            verbose=args.verbose,
             return_score=True,
             cache=cache,
             update_cache=dataset.cache_path,
@@ -125,6 +122,7 @@ def arg_parser():
     parser.add_argument("--wandb_group", type=str, default=None, help="wandb group")
 
     parser.add_argument("--debug", action="store_true", help="debug mode")
+    parser.add_argument("--verbose", action="store_true", help="verbose mode")
     args = parser.parse_args()
     return args
 

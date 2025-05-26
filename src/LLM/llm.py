@@ -56,11 +56,14 @@ class LLM(abc.ABC):
             self,
             queries: list[str],
             passages: list[str],
-            query_ids: list[int],
-            passage_ids: list[int],
+            query_ids: list[str],
+            passage_ids: list[str],
             cache:dict=None,
-            update_cache:str=False):
-
+            update_cache:str=False,
+            verbose:bool=False
+    ):
+        assert type(queries[0]) is str, "queries should be a list of strings"
+        assert type(passages[0]) is str, "passages should be a list of strings"
         """
         Get the relevance score of each passage for a given query using a single LLM call.
         Args:
@@ -70,6 +73,7 @@ class LLM(abc.ABC):
             passage_ids: A list of IDs for the passages.
             cache: A dictionary of cached results.
             update_cache: Path to the CSV file to update with new results. If provided, the results will be written to the CSV file.
+            verbose: Whether to print debug information.
         """
         if cache and (len(queries) == 1) and (len(passages) == 1):
             qid, pid = query_ids[0], passage_ids[0]
