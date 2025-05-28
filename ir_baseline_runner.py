@@ -1,86 +1,61 @@
 import argparse
+import json
 import os
 
-import wandb
-from src.Baseline import dense_retrieval
-
-from src.Dataset.ir_dataset import handle_dataset
-from src.Evaluation.evaluation import precision_k, mean_average_precision_k, recall_k, normalized_dcg_k
-
-from src.embedding import handle_embeddings
-
-import numpy as np
 from tqdm import tqdm
-from collections import defaultdict
+import wandb
+
+from src.Baseline import dense_retrieval
+from src.evaluate import evaluate
+from src.utils import load_dataset
 
 MODE="dense_retrieval"
 
-def main(dataset_name, model_name, args, save_flag=True):
-
-    configs = dict(vars(args))
-    configs['runner'] = MODE
-
+def main(dataset_name, model_name, args):
     if not args.wandb_disable:
+        configs = dict(vars(args))
+        configs['runner'] = MODE
         run = wandb.init(
-            project="bandit_v2",
+            project="bandit_dense_retrieval",
             config=configs,
             group=args.wandb_group,
         )
     else:
         run = None
 
-    ################### Load Data ###################
     base_path = os.path.dirname(os.path.abspath(__file__))
+    dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings = (
+        load_dataset(base_path, dataset_name, model_name))
 
-    query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
-    passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
-
-    query_embeddings_path = os.path.join(base_path, query_embeddings_path)
-    passage_embeddings_path = os.path.join(base_path, passage_embeddings_path)
-
-    print("Loading dataset...")
-    dataset = handle_dataset(dataset_name)
-    query_ids, queries, passage_ids, passages, relevance_map = dataset.load_data()
-    print("Loading embeddings...")
-    query_embeddings, passage_embeddings = handle_embeddings(base_path, model_name, query_embeddings_path, passage_embeddings_path,
-                                                             queries, passages, batch_size=args.batch_size)
-
-
-    ################### Evaluation ###################
-    k_retrieval = max(args.cutoff)
-    ndcg_k_dict = defaultdict(list)
-    prec_k_dict = defaultdict(list)
-    rec_k_dict = defaultdict(list)
-    map_k_dict = defaultdict(list)
-
-    print("=== Dense Retrieval ===")
-    for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc="Query", total=len(query_ids)):
-        items, scores = dense_retrieval(passage_ids, passage_embeddings, query_embedding, top_k_passages= k_retrieval, return_score=True)
-        gt = set([p_id for p_id, relevance in relevance_map[q_id].items() if relevance >= dataset.relevance_threshold])
-
-        for k_start in args.cutoff:
-            prec_k = precision_k(items, gt, k_start)
-            rec_k = recall_k(items, gt, k_start)
-            map_k = mean_average_precision_k(items, gt, k_start)
-            ndcg_k = normalized_dcg_k(items, relevance_map[q_id], k_start)
-
-            prec_k_dict[k_start].append(prec_k)
-            rec_k_dict[k_start].append(rec_k)
-            map_k_dict[k_start].append(map_k)
-            ndcg_k_dict[k_start].append(ndcg_k)
-
-
+    print("\n")
     results = {}
-    for k in prec_k_dict.keys():
-        print(f"Precision@{k}: {np.mean(prec_k_dict[k])}\n")
-        print(f"Recall@{k}: {np.mean(rec_k_dict[k])}\n")
-        print(f"MAP@{k}: {np.mean(map_k_dict[k])}\n")
-        print(f"NDCG@{k}: {np.mean(ndcg_k_dict[k])}\n")
+    for q_id, query_embedding in tqdm(zip(query_ids, query_embeddings), desc=" > Dense Retrieval", total=len(query_ids)):
+        preds, scores = dense_retrieval(
+            query_embedding=query_embedding,
+            passage_ids=passage_ids,
+            passage_embeddings=passage_embeddings,
+            top_k_passages=max(args.cutoff),
+            return_score=True
+        )
 
-        results[f"precision@{k}"] = np.mean(prec_k_dict[k])
-        results[f"recall@{k}"] = np.mean(rec_k_dict[k])
-        results[f"map@{k}"] = np.mean(map_k_dict[k])
-        results[f"ndcg@{k}"] = np.mean(ndcg_k_dict[k])
+        results[q_id] = {
+            "pred": preds,
+            "score": scores
+        }
+    metric, results = evaluate(results, relevance_map, args.cutoff, threshold=dataset.relevance_threshold)
+
+    if run is not None:
+        updated_dict = {}
+        for k, v in metric.items():
+            new_key = str(k).replace("@", "/")
+            updated_dict[new_key] = v
+        wandb.log(updated_dict)
+
+        os.makedirs(f"results/{dataset_name}/", exist_ok=True)
+        with open(f"results/{dataset_name}/{run.name}.json", "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=1, ensure_ascii=False)
+
+
 
     if run is not None:
         updated_dict = {}

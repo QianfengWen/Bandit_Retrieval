@@ -44,12 +44,12 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 
     print("\n")
     results = {}
-    for i, (query, q_id) in tqdm(enumerate(zip(queries, query_ids)), desc=" > Bandit Ranking", total=len(queries)):
+    for query, q_id, q_emb in tqdm(zip(queries, query_ids, query_embeddings), desc=" > Bandit Ranking", total=len(queries)):
         preds, scores, founds = bandit_retrieval(
             llm=llm,
             query=query,
             query_id=q_id,
-            query_embedding=query_embeddings[i],
+            query_embedding=q_emb,
             passages=passages,
             passage_ids=passage_ids.copy(),
             passage_embeddings=passage_embeddings,

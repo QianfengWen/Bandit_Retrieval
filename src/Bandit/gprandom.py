@@ -17,5 +17,6 @@ class GPRandom(Bandit):
         Returns:
             List of selected candidate indices.
         """
+        super().select(candidates, n=n)
         idx = np.random.choice(len(candidates), size=n, replace=False)
         return idx.tolist()

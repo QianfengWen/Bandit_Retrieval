@@ -80,6 +80,8 @@ class Bandit:
         """
         Get the top k candidates with highest mean values and their corresponding scores
         """
+        if not self.is_fitted:
+            self.fit(candidates)
         mu, sigma = self.get_mean_std(candidates)
         sorted_indices = np.argsort(-mu)[:k]
         top_k_scores = mu[sorted_indices]

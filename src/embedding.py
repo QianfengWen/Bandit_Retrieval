@@ -6,23 +6,14 @@ from sentence_transformers import SentenceTransformer
 
 
 def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size=32):
-    print(model_name)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     embedder = SentenceTransformer(model_name)
     embedder.max_seq_length = min(1024, embedder.max_seq_length)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    embedder.to(device)
-
-    if "Qwen2" in model_name:
-        query_prompt = "query"
-    else:
-        query_prompt = None
 
     print("Encoding queries..")
-    query_embeddings = embedder.encode(query_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size, prompt=query_prompt)
-    query_embeddings = query_embeddings.to('cpu')
+    query_embeddings = embedder.encode(query_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size, device=device)
     print("Encoding passages..")
-    passages_embeddings = embedder.encode(passage_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size)
-    passages_embeddings = passages_embeddings.to('cpu')
+    passages_embeddings = embedder.encode(passage_texts, convert_to_tensor=False, show_progress_bar=True, batch_size=batch_size, device=device)
 
     save_embeddings(query_embeddings, passages_embeddings, query_embeddings_path, passage_embeddings_path)
    

@@ -40,7 +40,7 @@ def seed_everything(seed: int = 42):
         pass
 
 
-def load_dataset(base_path, dataset_name, model_name, llm_name, prompt_type):
+def load_dataset(base_path, dataset_name, model_name, llm_name=None, prompt_type=None):
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
     cache_path = f"data/{dataset_name}/logit_{prompt_type}_{llm_name}_cache.csv" if llm_name else f"data/{dataset_name}/cache.csv"
@@ -58,7 +58,7 @@ def load_dataset(base_path, dataset_name, model_name, llm_name, prompt_type):
     print("\n >> Loading embeddings...")
     query_embeddings, passage_embeddings = handle_embeddings(model_name, query_embeddings_path, passage_embeddings_path,
                                                              queries, passages)
-    cache = dataset.load_cache()
+    cache = dataset.load_cache() if llm_name else None
     return dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings
 
 

@@ -66,7 +66,8 @@ def bandit_retrieval(
         update_cache: Path to the CSV file to update with new results.
         verbose: Whether to print debug information.
     """
-
+    if verbose:
+        print(f"\n > Query {query_id}")
     assert llm_budget > 0, "llm_budget should be greater than 0"
     assert k_cold_start <= llm_budget, "k_cold_start should be less than or equal to llm_budget"
 
@@ -100,7 +101,8 @@ def bandit_retrieval(
     pid2passage = {pid: passages[idx] for idx, pid in enumerate(passage_ids)}
     pid2emb = {pid: org_passage_embeddings[idx] for idx, pid in enumerate(passage_ids)}
     available_pids = set(passage_ids)
-    scores = {}
+    cold_scores = {}
+    bandit_scores = {}
 
     ############### Cold start ################
     if k_cold_start > 0:
@@ -110,7 +112,7 @@ def bandit_retrieval(
         available_pids = list(available_pids - set(cold_start_passage_ids))
 
         if verbose:
-            print("\n >> Cold start phase")
+            print(" >> Cold start phase")
             print(" >>> There are ", len(cold_start_passage_ids), " cold start ids")
 
         for batch_idx in range(0, len(cold_start_passage_ids), batch_size):
@@ -131,18 +133,17 @@ def bandit_retrieval(
             # store observations
             for pid, score in zip(batch, batch_scores):
                 score = float(score)
-                scores[pid] = score
+                cold_scores[pid] = score
                 bandit.update(pid2emb[pid], score)
 
         if verbose:  # debug print
-            print(" >>> Cold start batch scores: ", scores)
+            print(" >>> Cold start batch scores: ", cold_scores)
 
     ############### Exploration-exploitation ################
-    num_iterations = (llm_budget - k_cold_start) // batch_size
     if verbose:
-        print(f"\n >> Exploration-exploitation phase")
+        print(f" >> Exploration-exploitation phase")
 
-    for _ in tqdm(range(num_iterations), desc="Bandit Retrieval", disable=not verbose):
+    for _ in range(0, (llm_budget - k_cold_start), batch_size):
         if not available_pids:
             break
 
@@ -167,17 +168,18 @@ def bandit_retrieval(
 
         for pid, score in zip(next_ids, batch_scores):
             score = float(score)
-            scores[pid] = score
+            bandit_scores[pid] = score
             bandit.update(pid2emb[pid], score)  # Update model
 
     if verbose:  # debug print
-        print(" >>> Final scores: ", scores)
+        print(" >>> Bandit sbatch scores: ", bandit_scores)
+
 
     # return the top-k passages based on final GP predictions
     top_k_idx, top_k_scores = bandit.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
     if return_score:
-        return top_k_ids, top_k_scores.tolist(), scores
+        return top_k_ids, top_k_scores.tolist(), cold_scores|bandit_scores
 
     return top_k_ids
