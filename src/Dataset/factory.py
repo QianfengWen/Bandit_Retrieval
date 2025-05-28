@@ -1,4 +1,6 @@
+from src.Dataset.antique import Antique
 from src.Dataset.covid import Covid
+from src.Dataset.dbpedia import DBPedia
 from src.Dataset.dl19 import DL19
 from src.Dataset.dl20 import DL20
 from src.Dataset.fiqa import FiQA
@@ -25,6 +27,10 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = Scifact(cache_path=cache_path)
     elif dataset_name == 'fiqa':
         dataset = FiQA(cache_path=cache_path)
+    elif dataset_name == "dbpedia":
+        dataset = DBPedia(cache_path=cache_path)
+    elif dataset_name == "antique":
+        dataset = Antique(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset
