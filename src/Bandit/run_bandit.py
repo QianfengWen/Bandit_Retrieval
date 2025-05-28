@@ -2,10 +2,11 @@ from typing import Optional
 
 import numpy as np
 from sklearn.preprocessing import normalize
-from tqdm import tqdm
 
+from src.Bandit.gpei import GPEI
+from src.Bandit.gppi import GPPI
 from src.Bandit.gprandom import GPRandom
-from src.Bandit.gpthompson import GPThompson
+from src.Bandit.gpthompson_sub import GPThompsonSub
 from src.Bandit.gpucb import GPUCB
 from src.LLM.llm import LLM
 from src.utils import cosine_similarity
@@ -23,10 +24,11 @@ def bandit_retrieval(
         k_cold_start: int,
         use_query:Optional[int]=None,
         alpha:float=1e-3,
-        beta:float=2.0,
         length_scale:float=1,
         nu:float=2.5,
         acq_func:str="ucb",
+        beta:float=2.0,
+        xi:float=0.01,
         normalize_passage:bool=False,
         ard:bool=False,
         k_retrieval: int = 1000,
@@ -52,10 +54,11 @@ def bandit_retrieval(
         k_cold_start: Number of passages to retrieve in the cold start phase.
         use_query: Optional query embedding to use for the initial update.
         alpha: Regularization parameter for the GP.
-        beta: Exploration parameter for the GP-UCB.
         length_scale: Length scale for the GP kernel.
         nu: Parameter for the Matern kernel.
-        acq_func: Acquisition function to use for GP-UCB.
+        acq_func: Acquisition function.
+        beta: Exploration parameter for the GP-UCB.
+        xi: Exploration parameter for the GP-EI, GP-PI.
         normalize_passage: Whether to normalize passage embeddings.
         ard: Whether to use ARD (Automatic Relevance Determination).
         k_retrieval: Number of passages to retrieve at the end.
@@ -76,12 +79,17 @@ def bandit_retrieval(
     if acq_func == "ucb":
         bandit = GPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
     elif acq_func == "thompson":
-        bandit = GPThompson(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+        # bandit = GPThompson(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+        bandit = GPThompsonSub(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
     elif acq_func == "random":
         bandit = GPRandom(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
     elif acq_func == "greedy":
         k_cold_start = llm_budget
         bandit = GPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+    elif acq_func == "ei":
+        bandit = GPEI(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu, xi=xi)
+    elif acq_func == "pi":
+        bandit = GPPI(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu, xi=xi)
     else:
         raise ValueError(f"Invalid acquisition function: {acq_func}")
 

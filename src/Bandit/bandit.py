@@ -1,3 +1,4 @@
+import random
 from abc import abstractmethod
 
 import numpy as np
@@ -57,7 +58,7 @@ class Bandit:
             mu: Mean predictions
             sigma: Standard deviation predictions
         """
-        if not self.X:
+        if len(self.X) == 0:
             # If no observations, return default values
             return np.zeros(len(candidates)), np.ones(len(candidates))
 
@@ -90,7 +91,6 @@ class Bandit:
             return sorted_indices, top_k_scores
         return sorted_indices
 
-
     @abstractmethod
     def select(self, candidates, n=1):
         """
@@ -101,6 +101,8 @@ class Bandit:
         Returns:
             The selected candidate passage.
         """
-        # Fit GP model only if it hasn't been fitted since last update
+        if len(self.X) == 0:
+            return random.sample(range(len(candidates)), n)
+
         if not self.is_fitted:
             self.fit(candidates)

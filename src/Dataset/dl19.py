@@ -4,7 +4,6 @@ from src.Dataset.dataset import IRDataset
 class DL19(IRDataset):
     def __init__(self, data_name="msmarco-document/trec-dl-2019/judged", cache_path=None):
         super().__init__(data_name, cache_path)
-        self.relevance_threshold = 2
 
     def load_passages(self):
         passage_map = dict()

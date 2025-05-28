@@ -24,7 +24,8 @@ def dense_retrieval(
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
     if return_score:
-        top_k_scores = [sim_matrix[idx] for idx in top_k_idx]
+        top_k_scores = [float(sim_matrix[idx]) for idx in top_k_idx]
+
         return top_k_ids, top_k_scores
     return top_k_ids, None
 

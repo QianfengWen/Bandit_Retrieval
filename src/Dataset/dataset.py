@@ -16,7 +16,7 @@ class IRDataset(ABC):
         self.data_name = data_name
         self.cache_path = cache_path
 
-        self.relevance_threshold = None
+        self.relevance_threshold = 1
 
     def load_dataset(self):
         dataset = ir_datasets.load(self.data_name)

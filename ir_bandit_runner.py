@@ -55,10 +55,11 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             passage_embeddings=passage_embeddings,
             use_query=args.use_query,
             alpha=args.alpha,
-            beta=beta,
             length_scale=args.length_scale,
             nu=args.nu,
             acq_func=acq_func,
+            beta=beta,
+            xi=args.xi,
             kernel=kernel,
             normalize_passage=args.normalize,
             ard=args.ard,
@@ -107,6 +108,7 @@ def arg_parser():
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
     parser.add_argument("--length_scale", type=float, default=1)
     parser.add_argument("--nu", type=float, default=2.5, help='nu for Matern Kernel')
+    parser.add_argument("--xi", type=float, default=0.05, help='xi for EI/PI')
 
     parser.add_argument("--normalize", action="store_true", help="normalize the passage embeddings")
     parser.add_argument("--ard", action="store_true", help="use ARD")
@@ -114,6 +116,7 @@ def arg_parser():
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 5, 10, 50, 100])
+    parser.add_argument("--binary_relevance", type=int, default=1)
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
     parser.add_argument("--wandb_group", type=str, default=None, help="wandb group")

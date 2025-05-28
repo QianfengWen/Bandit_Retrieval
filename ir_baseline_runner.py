@@ -70,6 +70,7 @@ def arg_parser():
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
     parser.add_argument("--batch_size", type=int, default=64, help="batch size for embedding")
     parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
+    parser.add_argument("--binary_relevance", type=int, default=1)
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
     parser.add_argument("--wandb_group", type=str, default="dense_retrieval", help="wandb group")
