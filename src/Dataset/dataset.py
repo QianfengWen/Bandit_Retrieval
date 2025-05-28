@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import ir_datasets
 import pandas as pd
+from tqdm import tqdm
 
 
 class IRDataset(ABC):
@@ -21,11 +22,11 @@ class IRDataset(ABC):
         dataset = ir_datasets.load(self.data_name)
         return dataset
 
-    def load_questions(self):
+    def load_queries(self):
         question_map = dict()
         sub = dict()
 
-        for query in self.dataset.queries_iter():
+        for query in tqdm(self.dataset.queries_iter(), desc="Loading Queries", total=self.dataset.queries_count()):
             if query.text in question_map:
                 sub[query.query_id] = question_map[query.text]
             else:
@@ -41,7 +42,7 @@ class IRDataset(ABC):
         passage_map = dict()
         sub = dict()
 
-        for passage in self.dataset.docs_iter():
+        for passage in tqdm(self.dataset.docs_iter(), desc="Loading Passages", total=self.dataset.docs_count()):
             if passage.text in passage_map:
                 pass
             else:
@@ -56,7 +57,7 @@ class IRDataset(ABC):
     def create_relevance_map(self):
         relevance_map = defaultdict(dict)
 
-        for qrel in self.dataset.qrels_iter():
+        for qrel in tqdm(self.dataset.qrels_iter(), desc="Loading Qrels", total=self.dataset.qrels_count()):
             query_id = qrel.query_id
             doc_id = qrel.doc_id
             relevance = qrel.relevance
@@ -90,7 +91,7 @@ class IRDataset(ABC):
 
     def load_data(self):
         self.dataset = self.load_dataset()
-        question_ids, question_texts = self.load_questions()
+        question_ids, question_texts = self.load_queries()
         passage_ids, passage_texts = self.load_passages()
         relevance_map = self.create_relevance_map()
 

@@ -60,7 +60,6 @@ def main(dataset_name, model_name, top_k, args):
                 passage_ids=batch_passage_ids,
                 cache=cache,
                 update_cache=dataset.cache_path,
-                score_type=args.score_type,
             )
 
     print(f"> Total: {total}, Hit: {hit}, Hit rate: {hit / total:.4f}")

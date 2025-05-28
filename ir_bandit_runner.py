@@ -5,9 +5,8 @@ import os
 import numpy as np
 from tqdm import tqdm
 
-from src.GPUCB.run_gpucb import bandit_retrieval
-
 import wandb
+from src.Bandit.run_bandit import bandit_retrieval
 from src.LLM.factory import handle_llm
 from src.evaluate import evaluate
 from src.utils import load_dataset, seed_everything
@@ -15,8 +14,6 @@ from src.utils import load_dataset, seed_everything
 MODE="bandit"
 
 def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, kernel, args):
-    if args.acq_func != "ucb":
-        raise NotImplementedError
     if not args.wandb_disable:
         configs = dict(vars(args))
         configs['runner'] = MODE
@@ -97,14 +94,14 @@ def arg_parser():
     parser.add_argument("--seed", type=int, default=42, help="seed for random number generator")
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
 
-    parser.add_argument("--llm_name", type=str, default='unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit')
+    parser.add_argument("--llm_name", type=str, default='unsloth/Qwen3-14B-unsloth-bnb-4bit')
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
-    parser.add_argument("--prompt_type", type=str)
+    parser.add_argument("--prompt_type", type=str, default="zeroshot")
     parser.add_argument("--score_type", type=str, choices=['er', 'pr'], default='er')
     parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
     parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
 
-    parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'random', 'greedy'])
+    parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'thompson', 'random', 'greedy'])
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
     parser.add_argument("--alpha", type=float, default=1e-3)
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
@@ -116,7 +113,7 @@ def arg_parser():
 
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')
-    parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 10, 50, 100])
+    parser.add_argument("--cutoff", type=int, nargs="+", default=[1, 5, 10, 50, 100])
 
     parser.add_argument("--wandb_disable", action="store_true", help="disable wandb")
     parser.add_argument("--wandb_group", type=str, default=None, help="wandb group")

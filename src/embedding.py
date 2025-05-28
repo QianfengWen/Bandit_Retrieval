@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 
 def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path, batch_size=32):
     print(model_name)
-    embedder = SentenceTransformer(model_name, trust_remote_code=True)
+    embedder = SentenceTransformer(model_name)
     embedder.max_seq_length = min(1024, embedder.max_seq_length)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     embedder.to(device)

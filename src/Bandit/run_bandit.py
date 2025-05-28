@@ -4,7 +4,9 @@ import numpy as np
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
 
-from src.GPUCB.gpucb import GPUCB
+from src.Bandit.gprandom import GPRandom
+from src.Bandit.gpthompson import GPThompson
+from src.Bandit.gpucb import GPUCB
 from src.LLM.llm import LLM
 from src.utils import cosine_similarity
 
@@ -38,40 +40,49 @@ def bandit_retrieval(
 ):
     """
     Perform bandit retrieval using GP-UCB.
-    llm: LLM instance to use for scoring passages.
-    query: The query string.
-    query_id: The ID of the query.
-    query_embedding: The embedding of the query.
-    passages: List of passage texts.
-    passage_ids: List of passage IDs.
-    passage_embeddings: The embeddings of the passages.
-    llm_budget: Total number of LLM calls allowed.
-    k_cold_start: Number of passages to retrieve in the cold start phase.
-    use_query: Optional query embedding to use for the initial update.
-    alpha: Regularization parameter for the GP.
-    beta: Exploration parameter for the GP-UCB.
-    length_scale: Length scale for the GP kernel.
-    nu: Parameter for the Matern kernel.
-    acq_func: Acquisition function to use for GP-UCB.
-    normalize_passage: Whether to normalize passage embeddings.
-    ard: Whether to use ARD (Automatic Relevance Determination).
-    k_retrieval: Number of passages to retrieve at the end.
-    kernel: Kernel type for the GP.
-    batch_size: Number of passages to process in each LLM call.
-    return_score: Whether to return the scores of the retrieved passages.
-    cache: Cache for storing LLM scores.
-    update_cache: Path to the CSV file to update with new results.
-    verbose: Whether to print debug information.
+    Args:
+        llm: LLM instance to use for scoring passages.
+        query: The query string.
+        query_id: The ID of the query.
+        query_embedding: The embedding of the query.
+        passages: List of passage texts.
+        passage_ids: List of passage IDs.
+        passage_embeddings: The embeddings of the passages.
+        llm_budget: Total number of LLM calls allowed.
+        k_cold_start: Number of passages to retrieve in the cold start phase.
+        use_query: Optional query embedding to use for the initial update.
+        alpha: Regularization parameter for the GP.
+        beta: Exploration parameter for the GP-UCB.
+        length_scale: Length scale for the GP kernel.
+        nu: Parameter for the Matern kernel.
+        acq_func: Acquisition function to use for GP-UCB.
+        normalize_passage: Whether to normalize passage embeddings.
+        ard: Whether to use ARD (Automatic Relevance Determination).
+        k_retrieval: Number of passages to retrieve at the end.
+        kernel: Kernel type for the GP.
+        batch_size: Number of passages to process in each LLM call.
+        return_score: Whether to return the scores of the retrieved passages.
+        cache: Cache for storing LLM scores.
+        update_cache: Path to the CSV file to update with new results.
+        verbose: Whether to print debug information.
     """
 
     assert llm_budget > 0, "llm_budget should be greater than 0"
     assert k_cold_start <= llm_budget, "k_cold_start should be less than or equal to llm_budget"
 
-    # preprocess
     if ard:
         length_scale = [length_scale] * passage_embeddings.shape[1]
-    gpucb = GPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, acquisition_function=acq_func,
-                  nu=nu)
+    if acq_func == "ucb":
+        bandit = GPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+    elif acq_func == "thompson":
+        bandit = GPThompson(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+    elif acq_func == "random":
+        bandit = GPRandom(kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+    elif acq_func == "greedy":
+        k_cold_start = llm_budget
+        bandit = GPUCB(beta=beta, kernel=kernel, alpha=alpha, length_scale=length_scale, nu=nu)
+    else:
+        raise ValueError(f"Invalid acquisition function: {acq_func}")
 
     if normalize_passage:
         org_passage_embeddings = passage_embeddings.copy()
@@ -84,7 +95,7 @@ def bandit_retrieval(
         org_query_embedding = query_embedding
 
     if use_query is not None:
-        gpucb.update(query_embedding, use_query)
+        bandit.update(query_embedding, use_query)
 
     pid2passage = {pid: passages[idx] for idx, pid in enumerate(passage_ids)}
     pid2emb = {pid: org_passage_embeddings[idx] for idx, pid in enumerate(passage_ids)}
@@ -121,7 +132,7 @@ def bandit_retrieval(
             for pid, score in zip(batch, batch_scores):
                 score = float(score)
                 scores[pid] = score
-                gpucb.update(pid2emb[pid], score)
+                bandit.update(pid2emb[pid], score)
 
         if verbose:  # debug print
             print(" >>> Cold start batch scores: ", scores)
@@ -129,14 +140,14 @@ def bandit_retrieval(
     ############### Exploration-exploitation ################
     num_iterations = (llm_budget - k_cold_start) // batch_size
     if verbose:
-        print(f"\n > Exploration-exploitation phase")
+        print(f"\n >> Exploration-exploitation phase")
 
     for _ in tqdm(range(num_iterations), desc="Bandit Retrieval", disable=not verbose):
         if not available_pids:
             break
 
         available_embeddings = np.stack([pid2emb[p] for p in available_pids])
-        next_embedding_idxes = gpucb.select(available_embeddings, batch_size)
+        next_embedding_idxes = bandit.select(available_embeddings, batch_size)
         next_ids = [available_pids[idx] for idx in next_embedding_idxes]
 
         for pid in next_ids:
@@ -157,13 +168,13 @@ def bandit_retrieval(
         for pid, score in zip(next_ids, batch_scores):
             score = float(score)
             scores[pid] = score
-            gpucb.update(pid2emb[pid], score)  # Update model
+            bandit.update(pid2emb[pid], score)  # Update model
 
     if verbose:  # debug print
         print(" >>> Final scores: ", scores)
 
     # return the top-k passages based on final GP predictions
-    top_k_idx, top_k_scores = gpucb.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
+    top_k_idx, top_k_scores = bandit.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
     if return_score:
