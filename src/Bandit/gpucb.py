@@ -8,10 +8,9 @@ class GPUCB(Bandit):
     GP-UCB implementation specifically for retrieval tasks.
     """
     
-    def __init__(self, beta=2.0, kernel='rbf', alpha=1e-3, length_scale=1, nu=2.5):
-        super(GPUCB, self).__init__(kernel, alpha, length_scale, nu)
+    def __init__(self, beta=2.0, kernel='rbf', alpha=1e-3, alpha_method=None, length_scale=1, nu=2.5):
+        super(GPUCB, self).__init__(kernel=kernel, alpha=alpha, alpha_method=alpha_method, length_scale=length_scale, nu=nu)
         self.beta = beta
-
 
     def select(self, candidates, n=1):
         """

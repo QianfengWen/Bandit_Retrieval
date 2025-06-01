@@ -1,3 +1,4 @@
+import math
 import random
 from abc import abstractmethod
 
@@ -5,47 +6,82 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, DotProduct
 
-from src.Bandit.utils import CosineSimilarityKernel, optimizer
+from src.Bandit.utils import CosineSimilarityKernel, optimizer, logit2entropy, logit2confidence
 
 
 class Bandit:
-    def __init__(self, kernel='rbf', alpha=1e-3, length_scale=1, nu=2.5):
+    def __init__(self, kernel='rbf', alpha=1e-3, alpha_method=None, length_scale=1, nu=2.5):
+        self.alpha = alpha
+        self.alpha_method = alpha_method
+        self.length_scale = length_scale
+        self.nu = nu
         self.is_fitted = False
         # Observations
         self.X = []
         self.y = []
+        self.logit = []
 
         # Setup GP regressor with appropriate kernel:
         if kernel == "rbf":
-            kernel = C(1.0) * RBF(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2))
+            self.kernel = C(1.0) * RBF(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2))
         elif kernel == "matern":
-            kernel = C(1.0) * Matern(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2), nu=nu)
+            self.kernel = C(1.0) * Matern(length_scale=length_scale, length_scale_bounds=(1e-4, 1e2), nu=nu)
         elif kernel == 'dot_product':
-            kernel = C(1.0) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e5))
+            self.kernel = C(1.0) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e5))
         elif kernel == 'cosine_similarity':
-            kernel = C(1.0) * CosineSimilarityKernel()
+            self.kernel = C(1.0) * CosineSimilarityKernel()
         else:
             raise ValueError("Invalid kernel specified.")
 
         self.gp = GaussianProcessRegressor(
-            kernel=kernel,
+            kernel=self.kernel,
             alpha=alpha,
             normalize_y=True,
             n_restarts_optimizer=10,
             optimizer=optimizer
         )
 
-    def update(self, x, reward):
+    def update(self, x, reward, logit):
         """
         Update the GP model with a new observation
         Args:
             x: The input passage embedding
-            reward: Observed reward from LL<
+            reward: Observed reward from LLM
+            logit: Logit from LLM
         """
         self.X.append(x)
         self.y.append(float(reward))
+        self.logit.append(logit)
         # Mark that model needs refitting after new data
         self.is_fitted = False
+
+    def set_alpha(self):
+        """
+        Set per-sample noise level (alpha)
+            raw: alpha = entropy
+            linear: alpha = base * (entropy / logK)
+            confidence: alpha = base * confidence
+        """
+        k = len(self.logit[0])
+        if self.alpha_method == "raw":
+            alpha = [logit2entropy(l) for l in self.logit]
+        elif self.alpha_method == "linear":
+            alpha = [self.alpha * logit2entropy(l) / math.log(k) for l in self.logit]
+        elif self.alpha_method == "confidence":
+            alpha = [self.alpha * logit2confidence(l) for l in self.logit]
+        else:
+            raise ValueError(f"Invalid alpha method {self.alpha_method}")
+
+        alpha = [max(1e-6, a) for a in alpha]
+        alpha = np.array(alpha)
+
+        self.gp = GaussianProcessRegressor(
+            kernel=self.kernel,
+            alpha=alpha,
+            normalize_y=True,
+            n_restarts_optimizer=10,
+            optimizer=optimizer
+        )
 
     def get_mean_std(self, candidates):
         """
@@ -68,7 +104,9 @@ class Bandit:
         return mu, sigma
 
     def fit(self, candidates):
-        # Ensure proper X format for fitting
+        if self.alpha_method is not None:
+            self.set_alpha()
+
         X_train = np.stack(self.X)
         if X_train.ndim != 1:
             X_train = X_train.reshape(-1, candidates.shape[1])
@@ -83,6 +121,7 @@ class Bandit:
         """
         if not self.is_fitted:
             self.fit(candidates)
+
         mu, sigma = self.get_mean_std(candidates)
         sorted_indices = np.argsort(-mu)[:k]
         top_k_scores = mu[sorted_indices]

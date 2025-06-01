@@ -53,14 +53,17 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             passages=passages,
             passage_ids=passage_ids.copy(),
             passage_embeddings=passage_embeddings,
-            use_query=args.use_query,
-            alpha=args.alpha,
-            length_scale=args.length_scale,
-            nu=args.nu,
-            acq_func=acq_func,
-            beta=beta,
-            xi=args.xi,
+
             kernel=kernel,
+            acq_func=acq_func,
+            alpha=args.alpha,
+            alpha_method=args.alpha_method,
+            length_scale=args.length_scale,
+            beta=beta,
+            nu=args.nu,
+            xi=args.xi,
+
+            use_query=args.use_query,
             normalize_passage=args.normalize,
             ard=args.ard,
 
@@ -99,17 +102,18 @@ def arg_parser():
     parser.add_argument('--llm_budget', type=int, default=50, help='llm budget for bandit')
     parser.add_argument("--prompt_type", type=str, default="zeroshot")
     parser.add_argument("--score_type", type=str, choices=['er', 'pr'], default='er')
-    parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
-    parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
 
-    parser.add_argument('--acq_func', type=str, default='ucb', choices=['ucb', 'thompson', 'random', 'greedy'])
+    parser.add_argument('--cold_start', type=int, default=25, help='cold start for bandit')
+    parser.add_argument('--acq_func', type=str, default='ucb')
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
     parser.add_argument("--alpha", type=float, default=1e-3)
-    parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
+    parser.add_argument("--alpha_method", type=str, default=None)
     parser.add_argument("--length_scale", type=float, default=1)
+    parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
     parser.add_argument("--nu", type=float, default=2.5, help='nu for Matern Kernel')
     parser.add_argument("--xi", type=float, default=0.05, help='xi for EI/PI')
 
+    parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
     parser.add_argument("--normalize", action="store_true", help="normalize the passage embeddings")
     parser.add_argument("--ard", action="store_true", help="use ARD")
 

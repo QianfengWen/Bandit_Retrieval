@@ -7,9 +7,6 @@ import torch
 from filelock import FileLock
 from unsloth import FastLanguageModel
 
-from src.utils import logit2entropy
-
-
 class LLM(abc.ABC):
     """
     Abstract class for Language Model (LLM)
@@ -78,7 +75,7 @@ class LLM(abc.ABC):
         if cache and (len(queries) == 1) and (len(passages) == 1):
             qid, pid = query_ids[0], passage_ids[0]
             if pid in cache.get(qid, {}):
-                return [cache[qid][pid][self.score_type]], [logit2entropy(cache[qid][pid]['logit'])]
+                return [cache[qid][pid][self.score_type]], [cache[qid][pid]['logit']]
 
         batch_qps = [(q, p) for q, p in zip(queries, passages)]
         logit = self.get_logit(batch_qps)

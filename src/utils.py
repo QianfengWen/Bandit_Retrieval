@@ -60,17 +60,3 @@ def load_dataset(base_path, dataset_name, model_name, llm_name=None, prompt_type
                                                              queries, passages)
     cache = dataset.load_cache() if llm_name else None
     return dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings
-
-
-def logit2entropy(logit):
-    """
-    Convert logit to entropy.
-    Args:
-        logit: The logit output from the model.
-    Returns:
-        The entropy of the logit.
-    """
-    logit = torch.tensor(logit)
-    prob = torch.softmax(logit, dim=-1)
-    entropy = torch.sum(prob * torch.log(prob + 1e-10), dim=-1)
-    return entropy.cpu().numpy()

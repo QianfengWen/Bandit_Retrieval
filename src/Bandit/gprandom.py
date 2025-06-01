@@ -3,8 +3,8 @@ import numpy as np
 from src.Bandit.bandit import Bandit
 
 class GPRandom(Bandit):
-    def __init__(self, kernel='rbf', alpha=1e-3, length_scale=1, nu=2.5):
-        super().__init__(kernel, alpha, length_scale, nu)
+    def __init__(self, kernel='rbf', alpha=1e-3, alpha_method=None, length_scale=1, nu=2.5):
+        super().__init__(kernel=kernel, alpha=alpha, alpha_method=alpha_method, length_scale=length_scale, nu=nu)
 
     def select(self, candidates, n=1):
         """

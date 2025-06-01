@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from scipy.special import softmax
 from sklearn.gaussian_process.kernels import NormalizedKernelMixin, Kernel
 
 
@@ -34,3 +35,29 @@ class CosineSimilarityKernel(NormalizedKernelMixin, Kernel):
     def is_stationary(self):
         return False
 
+
+def logit2entropy(logit: list[float]):
+    """
+        Convert logit to entropy.
+        Args:
+            logit: The logit output from the model.
+        Returns:
+            The entropy of the logit.
+    """
+    logit = np.array(logit, dtype=np.float64)
+
+    exp_logits = np.exp(logit - np.max(logit))
+    probs = exp_logits / np.sum(exp_logits)
+    return -np.sum(probs * np.log(probs + 1e-12))
+
+
+def logit2confidence(logit: list[float]):
+    """
+        Convert logit to confidence.
+        Args:
+            logit: The logit output from the model.
+        Returns:
+            The confidence of the logit.
+    """
+    probs = softmax(logit)
+    return 1.0 - np.max(probs)
