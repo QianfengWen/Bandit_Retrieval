@@ -4,6 +4,7 @@ from src.Dataset.dbpedia import DBPedia
 from src.Dataset.dl19 import DL19
 from src.Dataset.dl20 import DL20
 from src.Dataset.fiqa import FiQA
+from src.Dataset.news import News
 from src.Dataset.nfcorpus import NfCorpus
 from src.Dataset.scidocs import Scidocs
 from src.Dataset.scifact import Scifact
@@ -31,6 +32,8 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = DBPedia(cache_path=cache_path)
     elif dataset_name == "antique":
         dataset = Antique(cache_path=cache_path)
+    elif dataset_name == "news":
+        dataset = News(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset

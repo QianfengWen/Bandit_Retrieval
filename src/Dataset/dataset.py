@@ -44,7 +44,7 @@ class IRDataset(ABC):
 
         for passage in tqdm(self.dataset.docs_iter(), desc="Loading Passages", total=self.dataset.docs_count()):
             if passage.text in passage_map:
-                pass
+                sub[passage.doc_id] = passage_map[passage.text]
             else:
                 passage_map[passage.text] = passage.doc_id
 
@@ -91,8 +91,8 @@ class IRDataset(ABC):
 
     def load_data(self):
         self.dataset = self.load_dataset()
-        question_ids, question_texts = self.load_queries()
         passage_ids, passage_texts = self.load_passages()
+        question_ids, question_texts = self.load_queries()
         relevance_map = self.create_relevance_map()
 
         return question_ids, question_texts, passage_ids, passage_texts, relevance_map
