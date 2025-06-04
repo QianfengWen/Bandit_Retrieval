@@ -6,7 +6,8 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, Matern, DotProduct
 
-from src.Bandit.utils import CosineSimilarityKernel, optimizer, logit2entropy, logit2confidence
+from src.SKBandit.utils import CosineSimilarityKernel, optimizer
+from src.utils import logit2entropy, logit2confidence
 
 
 class Bandit:

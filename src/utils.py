@@ -4,6 +4,7 @@ import random
 import numpy as np
 import sklearn
 import torch
+from scipy.special import softmax
 
 from src.Dataset.factory import handle_dataset
 from src.embedding import handle_embeddings
@@ -60,3 +61,30 @@ def load_dataset(base_path, dataset_name, model_name, llm_name=None, prompt_type
                                                              queries, passages)
     cache = dataset.load_cache() if llm_name else None
     return dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings
+
+
+def logit2entropy(logit: list[float]):
+    """
+        Convert logit to entropy.
+        Args:
+            logit: The logit output from the model.
+        Returns:
+            The entropy of the logit.
+    """
+    logit = np.array(logit, dtype=np.float64)
+
+    exp_logits = np.exp(logit - np.max(logit))
+    probs = exp_logits / np.sum(exp_logits)
+    return -np.sum(probs * np.log(probs + 1e-12))
+
+
+def logit2confidence(logit: list[float]):
+    """
+        Convert logit to confidence.
+        Args:
+            logit: The logit output from the model.
+        Returns:
+            The confidence of the logit.
+    """
+    probs = softmax(logit)
+    return 1.0 - np.max(probs)

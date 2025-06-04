@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 import wandb
-from src.SKBandit.run_bandit import bandit_retrieval
+from src.GPBandit.run_bandit import gp_bandit_retrieval_optimized
 from src.LLM.factory import handle_llm
 from src.evaluate import evaluate
 from src.utils import load_dataset, seed_everything
@@ -21,6 +21,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             project="bandit_gpucb",
             config=configs,
             group=args.wandb_group,
+            tags=["gpytorch"]
         )
     else:
         run = None
@@ -45,7 +46,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     print("\n")
     results = {}
     for query, q_id, q_emb in tqdm(zip(queries, query_ids, query_embeddings), desc=" > Bandit Ranking", total=len(queries)):
-        preds, scores, founds = bandit_retrieval(
+        preds, scores, founds = gp_bandit_retrieval_optimized(
             llm=llm,
             query=query,
             query_id=q_id,
@@ -58,6 +59,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             acq_func=acq_func,
             alpha=args.alpha,
             alpha_method=args.alpha_method,
+            train_alpha=args.train_alpha,
             length_scale=args.length_scale,
             beta=beta,
             nu=args.nu,
@@ -108,6 +110,7 @@ def arg_parser():
     parser.add_argument('--kernel', type=str, default='rbf', help='kernel for bandit')
     parser.add_argument("--alpha", type=float, default=1e-3)
     parser.add_argument("--alpha_method", type=str, default=None)
+    parser.add_argument("--train_alpha", action="store_true", help="train alpha parameter")
     parser.add_argument("--length_scale", type=float, default=1)
     parser.add_argument('--beta', type=float, default=2, help='beta for bandit')
     parser.add_argument("--nu", type=float, default=2.5, help='nu for Matern Kernel')

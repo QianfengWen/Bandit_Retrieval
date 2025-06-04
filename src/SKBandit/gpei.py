@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 
-from src.Bandit.bandit import Bandit
+from src.SKBandit.bandit import Bandit
 
 
 class GPEI(Bandit):

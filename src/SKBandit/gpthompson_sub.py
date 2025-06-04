@@ -1,8 +1,8 @@
 import numpy as np
 
-from src.Bandit.bandit import Bandit
+from src.SKBandit.bandit import Bandit
 
-class GPThompson(Bandit):
+class GPThompsonSub(Bandit):
     def __init__(self, kernel='rbf', alpha=1e-3, alpha_method=None, length_scale=1, nu=2.5):
         super().__init__(kernel=kernel, alpha=alpha, alpha_method=alpha_method, length_scale=length_scale, nu=nu)
 
@@ -18,9 +18,8 @@ class GPThompson(Bandit):
             List of selected candidate indices.
         """
         super().select(candidates, n=n)
-
-        samples = self.gp.sample_y(candidates,
-                                   n_samples=1).ravel()
+        mean, std = self.gp.predict(candidates, return_std=True)
+        samples = mean + std * np.random.randn(len(candidates))
 
         top_idx = np.argsort(-samples)[:n]
         return top_idx

@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.Bandit.bandit import Bandit
+from src.SKBandit.bandit import Bandit
 
 
 class GPUCB(Bandit):

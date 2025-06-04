@@ -1,14 +1,14 @@
 import numpy as np
 
-from src.Bandit.bandit import Bandit
+from src.SKBandit.bandit import Bandit
 
-class GPRandom(Bandit):
+class GPThompson(Bandit):
     def __init__(self, kernel='rbf', alpha=1e-3, alpha_method=None, length_scale=1, nu=2.5):
         super().__init__(kernel=kernel, alpha=alpha, alpha_method=alpha_method, length_scale=length_scale, nu=nu)
 
     def select(self, candidates, n=1):
         """
-        Select candidates randomly
+        Select candidates based on Thompson sampling.
 
         Args:
             candidates: List of candidate embeddings to sample from.
@@ -18,5 +18,9 @@ class GPRandom(Bandit):
             List of selected candidate indices.
         """
         super().select(candidates, n=n)
-        idx = np.random.choice(len(candidates), size=n, replace=False)
-        return idx.tolist()
+
+        samples = self.gp.sample_y(candidates,
+                                   n_samples=1).ravel()
+
+        top_idx = np.argsort(-samples)[:n]
+        return top_idx

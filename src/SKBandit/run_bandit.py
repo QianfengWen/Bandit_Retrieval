@@ -3,11 +3,11 @@ from typing import Optional
 import numpy as np
 from sklearn.preprocessing import normalize
 
-from src.Bandit.gpei import GPEI
-from src.Bandit.gppi import GPPI
-from src.Bandit.gprandom import GPRandom
-from src.Bandit.gpthompson_sub import GPThompsonSub
-from src.Bandit.gpucb import GPUCB
+from src.SKBandit.gpei import GPEI
+from src.SKBandit.gppi import GPPI
+from src.SKBandit.gprandom import GPRandom
+from src.SKBandit.gpthompson_sub import GPThompsonSub
+from src.SKBandit.gpucb import GPUCB
 from src.LLM.llm import LLM
 from src.utils import cosine_similarity
 

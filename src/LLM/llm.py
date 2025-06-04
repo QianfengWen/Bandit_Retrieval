@@ -80,7 +80,6 @@ class LLM(abc.ABC):
         batch_qps = [(q, p) for q, p in zip(queries, passages)]
         logit = self.get_logit(batch_qps)
         prob = torch.softmax(logit, dim=-1)
-        entropy = torch.sum(prob * torch.log(prob + 1e-10), dim=-1)
         er_scores = torch.sum(prob * self.label2weight, dim=-1).cpu().numpy()
         pr_scores = torch.argmax(prob, dim=-1).cpu().numpy()
 
@@ -104,9 +103,9 @@ class LLM(abc.ABC):
                     writer.writerows(new_entries)
 
         if self.score_type=='er':
-            return er_scores, entropy
+            return er_scores, logit
         elif self.score_type=='pr':
-            return pr_scores, entropy
+            return pr_scores, logit
         else:
             raise ValueError("score_type should be either 'er' or 'pr'")
 
