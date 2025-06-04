@@ -1,12 +1,17 @@
+import copy
 import math
 
 import gpytorch
 import torch
 from botorch import fit_gpytorch_mll
+from botorch.models.gp_regression import SingleTaskGP
 from botorch.models.transforms import Standardize
+from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.constraints import Interval
 from gpytorch.kernels import RBFKernel, ScaleKernel
 from gpytorch.likelihoods import FixedNoiseGaussianLikelihood, GaussianLikelihood
+from gpytorch.priors import UniformPrior, GammaPrior
+from torch.optim import LBFGS
 
 
 class _ExactGPModel(gpytorch.models.ExactGP):
@@ -91,25 +96,49 @@ class GPUCB:
 
         return mean, std
 
-    def fit(self,):
+    def fit(self,n_restarts=5):
         if not self.dirty:
             return
 
         self.gp.train()
         self.likelihood.train()
 
-        fit_gpytorch_mll(self.mll)
+        mll = self.mll
+        base_state = copy.deepcopy(mll.state_dict())
+        best_mll_val, best_state = -float("inf"), None
+        train_X, train_Y = mll.model.train_inputs[0], mll.model.train_targets
+
+        for _ in range(n_restarts):
+            mll.load_state_dict(base_state)
+            fit_gpytorch_mll_torch(mll)
+
+            # 1‑3) 현재 MLL 평가
+            mll.model.eval()
+            mll.eval()
+            with torch.no_grad():
+                output = mll.model(train_X)  # MultivariateNormal
+                curr_mll_val = mll(output, train_Y).item()
+
+            # 1‑4) 최고 기록 갱신
+            if curr_mll_val > best_mll_val:
+                best_mll_val = curr_mll_val
+                best_state = copy.deepcopy(mll.state_dict())
+
+        # 4) Load the best run
+        self.mll.load_state_dict(best_state)
+        self.mll.eval()
+        self.gp.eval()
+        self.likelihood.eval()
 
         self.dirty=False
 
 
     def _init_gp(self,train_x, train_y, train_noise=None):
         # set kernel (ard, length_scale)
-        length_constraint = Interval(lower_bound=1e-4, upper_bound=1e2, initial_value=self.length_scale if self.length_scale is not None else 1)
-        kernel = ScaleKernel(RBFKernel(
-            lengthscale_constraint=length_constraint,
-            ard_num_dims=train_x.shape[1] if self.ard else None,
-        ).to(self.device, dtype=self.dtype))
+        ls_prior = UniformPrior(1e-10, 30)
+        length_constraint = Interval(lower_bound=1e-5, upper_bound=1e2, initial_value=self.length_scale if self.length_scale is not None else 1)
+        base_kernel = RBFKernel(lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
+        kernel = ScaleKernel(base_kernel, outputscale_prior=GammaPrior(2.0, 0.15),).to(self.device, dtype=self.dtype)
 
 
         # set likelihood (alpha)
@@ -142,6 +171,7 @@ class GPUCB:
 
     def select(self, candidates, n=1):
         self.fit()
+
         mu, sigma = self.predict(candidates)
         ucb = mu + torch.sqrt(self.beta) * sigma
         return torch.topk(ucb, n).indices
