@@ -29,7 +29,8 @@ def main(
     dataset_name = dataset_name
     dataset = handle_dataset(dataset_name)
    
-    model_name = "all-MiniLM-L6-v2"
+    # model_name = "all-MiniLM-L6-v2"
+    model_name = "msmarco-distilbert-base-tas-b"
     query_embeddings_path = f"data/{dataset_name}/{model_name}_query_embeddings.pkl"
     passage_embeddings_path = f"data/{dataset_name}/{model_name}_passage_embeddings.pkl"
 
