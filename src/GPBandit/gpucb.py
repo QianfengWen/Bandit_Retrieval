@@ -11,7 +11,7 @@ from gpytorch.constraints import Interval
 from gpytorch.kernels import RBFKernel, ScaleKernel
 from gpytorch.likelihoods import FixedNoiseGaussianLikelihood, GaussianLikelihood
 from gpytorch.priors import UniformPrior, GammaPrior
-from torch.optim import LBFGS
+from torch.optim import LBFGS, Adam
 
 
 class _ExactGPModel(gpytorch.models.ExactGP):
@@ -38,6 +38,8 @@ class GPUCB:
                  verbose=False
                  ):
 
+        self.x = None
+        self.noise = None
         self.dtype = torch.double
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -72,20 +74,25 @@ class GPUCB:
         noise_t = torch.as_tensor(self.logit2noise(logit), dtype=self.dtype, device=self.device).unsqueeze(0)
 
         if self.gp is None:
-            self._init_gp(x_t, y_t, noise_t)
+            self.x = x_t
+            self.y = y_t
+            self.noise = noise_t
+            self._init_gp(self.x, self.y, self.noise)
         else:
-            new_x = torch.cat([self.gp.train_inputs[0], x_t], dim=0)
-            new_y = torch.cat([self.gp.train_targets, y_t], dim=0)
-            self.gp.set_train_data(new_x, new_y, strict=False)
+            self.x = torch.cat([self.x, x_t], dim=0)
+            self.y = torch.cat([self.y, y_t], dim=0)
+            self.gp.set_train_data(self.x, self.y, strict=False)
 
             if isinstance(self.likelihood, FixedNoiseGaussianLikelihood):
                 self.likelihood.noise_covar.noise = torch.cat(
                     [self.likelihood.noise_covar.noise, noise_t], dim=0
                 )
+
         self.dirty = True
 
     @torch.no_grad()
     def predict(self, candidates):
+        # TODO: Make it a batch prediction
         self.gp.eval()
         self.likelihood.eval()
         c_t = torch.as_tensor(candidates, dtype=self.dtype, device=self.device)
@@ -96,36 +103,26 @@ class GPUCB:
 
         return mean, std
 
-    def fit(self,n_restarts=5):
+    def fit(self):
         if not self.dirty:
             return
-
+        self.mll.train()
         self.gp.train()
         self.likelihood.train()
 
-        mll = self.mll
-        base_state = copy.deepcopy(mll.state_dict())
-        best_mll_val, best_state = -float("inf"), None
-        train_X, train_Y = mll.model.train_inputs[0], mll.model.train_targets
+        warmup_steps = 100
+        adam_lr = 0.05
+        adam = Adam(self.mll.parameters(), lr=adam_lr)
 
-        for _ in range(n_restarts):
-            mll.load_state_dict(base_state)
-            fit_gpytorch_mll_torch(mll)
+        for i in range(warmup_steps):
+            adam.zero_grad()
+            output = self.gp(self.x)
+            loss = -self.mll(output, self.y)
+            loss.backward()
+            adam.step()
 
-            # 1‑3) 현재 MLL 평가
-            mll.model.eval()
-            mll.eval()
-            with torch.no_grad():
-                output = mll.model(train_X)  # MultivariateNormal
-                curr_mll_val = mll(output, train_Y).item()
+        fit_gpytorch_mll(self.mll)
 
-            # 1‑4) 최고 기록 갱신
-            if curr_mll_val > best_mll_val:
-                best_mll_val = curr_mll_val
-                best_state = copy.deepcopy(mll.state_dict())
-
-        # 4) Load the best run
-        self.mll.load_state_dict(best_state)
         self.mll.eval()
         self.gp.eval()
         self.likelihood.eval()
@@ -139,7 +136,6 @@ class GPUCB:
         length_constraint = Interval(lower_bound=1e-5, upper_bound=1e2, initial_value=self.length_scale if self.length_scale is not None else 1)
         base_kernel = RBFKernel(lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
         kernel = ScaleKernel(base_kernel, outputscale_prior=GammaPrior(2.0, 0.15),).to(self.device, dtype=self.dtype)
-
 
         # set likelihood (alpha)
         if self.alpha_method is None:
@@ -178,8 +174,7 @@ class GPUCB:
 
 @torch.no_grad()
 def softmax_t(x: torch.Tensor) -> torch.Tensor:
-    x = x - x.max()
-    return x.exp() / x.exp().sum()
+    return torch.nn.functional.softmax(x.double(), dim=-1)
 
 @torch.no_grad()
 def logit2entropy(logit: list[float] | torch.Tensor) -> float:

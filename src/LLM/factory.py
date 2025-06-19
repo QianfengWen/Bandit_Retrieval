@@ -22,6 +22,9 @@ def handle_llm(llm_name, prompt_type=None, score_type=None):
     elif llm_name == "unsloth/Mistral-Nemo-Instruct-2407-bnb-4bit":
         llm = Mistral(model_name=llm_name, prompt_type=prompt_type, score_type=score_type)
 
+    elif llm_name == "unsloth/Llama-4-Scout-17B-16E-Instruct-unsloth-bnb-4bit":
+        llm = Llama4(model_name=llm_name, prompt_type=prompt_type, score_type=score_type)
+
     else:
         raise Exception(f"Unknown llm name: {llm_name}")
     return llm
