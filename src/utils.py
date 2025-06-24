@@ -62,6 +62,19 @@ def load_dataset(base_path, dataset_name, model_name, llm_name=None, prompt_type
     cache = dataset.load_cache() if llm_name else None
     return dataset, cache, relevance_map, queries, passages, query_ids, passage_ids, query_embeddings, passage_embeddings
 
+def get_cache(cache, query_id, passage_id):
+    """
+        Get the cache for a specific query and passage.
+        Args:
+            cache: The cache dictionary.
+            query_id: The ID of the query.
+            passage_id: The ID of the passage.
+        Returns:
+            The cached value if it exists, otherwise None.
+    """
+    if cache and query_id in cache and passage_id in cache[query_id]:
+        return cache[query_id][passage_id]
+    return None
 
 def logit2entropy(logit: list[float]):
     """

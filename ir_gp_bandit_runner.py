@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 
-import numpy as np
 from tqdm import tqdm
 
 import wandb
@@ -41,19 +40,27 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         k_cold_start = 5
 
     k_retrieval = max(args.cutoff)
-    llm = handle_llm(args.llm_name,args.prompt_type,args.score_type)
+    if args.offline:
+        print("\n > OFFLINE MODE")
+        llm = None
+    else:
+        llm = handle_llm(args.llm_name,args.prompt_type,args.score_type)
 
     print("\n")
     results = {}
     for query, q_id, q_emb in tqdm(zip(queries, query_ids, query_embeddings), desc=" > Bandit Ranking", total=len(queries)):
         preds, scores, founds = gp_bandit_retrieval_optimized(
-            llm=llm,
             query=query,
             query_id=q_id,
             query_embedding=q_emb,
             passages=passages,
             passage_ids=passage_ids.copy(),
             passage_embeddings=passage_embeddings,
+
+            llm=llm,
+            llm_budget=llm_budget,
+            k_cold_start=k_cold_start,
+            score_type=args.score_type,
 
             kernel=kernel,
             acq_func=acq_func,
@@ -62,20 +69,21 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
             train_alpha=args.train_alpha,
             length_scale=args.length_scale,
             beta=beta,
-            nu=args.nu,
-            xi=args.xi,
+            # nu=args.nu,
+            # xi=args.xi,
 
             use_query=args.use_query,
-            normalize_passage=args.normalize,
+            # normalize_passage=args.normalize,
             ard=args.ard,
 
-            llm_budget=llm_budget,
-            k_cold_start=k_cold_start,
             k_retrieval=k_retrieval,
-            verbose=args.verbose,
+            batch_size=1,
+
+            offline=args.offline,
             return_score=True,
             cache=cache,
             update_cache=dataset.cache_path,
+            verbose=args.verbose,
         )
         results[q_id] = {
             "pred": preds,
@@ -130,6 +138,7 @@ def arg_parser():
 
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--verbose", action="store_true", help="verbose mode")
+    parser.add_argument("--offline", action="store_true", help="offline mode")
     args = parser.parse_args()
     return args
 

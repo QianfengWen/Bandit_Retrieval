@@ -71,7 +71,7 @@ class GPUCB:
     def update(self, x, y, logit=None):
         x_t = torch.as_tensor(x, dtype=self.dtype, device=self.device).unsqueeze(0)  # (1, D)
         y_t = torch.as_tensor(y, dtype=self.dtype, device=self.device).unsqueeze(0)  # (1, 1)
-        noise_t = torch.as_tensor(self.logit2noise(logit), dtype=self.dtype, device=self.device).unsqueeze(0)
+        noise_t = torch.as_tensor(self.logit2noise(logit), dtype=self.dtype, device=self.device).unsqueeze(0) if logit is not None else None
 
         if self.gp is None:
             self.x = x_t
@@ -147,6 +147,8 @@ class GPUCB:
                     noise= torch.full_like(train_y, fill_value=self.alpha),
                     learn_additional_noise=False)
         else:
+            if train_noise is None:
+                raise ValueError("train_noise must be provided when alpha_method is specified")
             self.likelihood = FixedNoiseGaussianLikelihood(
                 noise=train_noise,
                 learn_additional_noise=self.train_alpha
