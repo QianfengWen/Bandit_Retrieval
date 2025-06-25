@@ -4,7 +4,6 @@ import numpy as np
 import torch
 
 from src.GPBandit.gpucb import GPUCB
-from src.LLM.llm import LLM
 from src.utils import get_cache
 
 
@@ -16,7 +15,7 @@ def gp_bandit_retrieval_optimized(
         passage_ids: list[str],
         passage_embeddings: np.ndarray,
 
-        llm: Optional[LLM],
+        llm,
         llm_budget: int,
         k_cold_start: int,
         score_type: str,
@@ -139,6 +138,8 @@ def gp_bandit_retrieval_optimized(
             cold_scores[selected_idx] = float(cached[score_type])
             bandit.update(passage_embeddings_t[selected_idx], float(selected_score), selected_logit)
         else:
+            if offline:
+                raise ValueError("Offline mode but uncached passages found.")
             scores, logits = llm.get_score(
                 [query], selected_passage, [query_id], selected_id,
                 cache=cache, update_cache=update_cache, verbose=verbose
