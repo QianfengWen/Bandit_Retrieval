@@ -1,9 +1,7 @@
 import argparse
 import json
 import os
-
 from tqdm import tqdm
-
 import wandb
 from src.GPBandit.run_bandit import gp_bandit_retrieval_optimized
 from src.LLM.factory import handle_llm

@@ -1,17 +1,13 @@
-import copy
 import math
 
 import gpytorch
 import torch
 from botorch import fit_gpytorch_mll
-from botorch.models.gp_regression import SingleTaskGP
-from botorch.models.transforms import Standardize
-from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.constraints import Interval
 from gpytorch.kernels import RBFKernel, ScaleKernel
 from gpytorch.likelihoods import FixedNoiseGaussianLikelihood, GaussianLikelihood
 from gpytorch.priors import UniformPrior, GammaPrior
-from torch.optim import LBFGS, Adam
+from torch.optim import Adam
 
 
 class _ExactGPModel(gpytorch.models.ExactGP):
@@ -69,8 +65,12 @@ class GPUCB:
         return noise
 
     def update(self, x, y, logit=None):
-        x_t = torch.as_tensor(x, dtype=self.dtype, device=self.device).unsqueeze(0)  # (1, D)
-        y_t = torch.as_tensor(y, dtype=self.dtype, device=self.device).unsqueeze(0)  # (1, 1)
+        x_t = torch.as_tensor(x, dtype=self.dtype, device=self.device)
+        y_t = torch.as_tensor(y, dtype=self.dtype, device=self.device)
+        if x_t.ndim == 1:
+            x_t = x_t.unsqueeze(0)
+        if y_t.ndim == 0:
+            y_t = y_t.unsqueeze(0)
         noise_t = torch.as_tensor(self.logit2noise(logit), dtype=self.dtype, device=self.device).unsqueeze(0) if logit is not None else None
 
         if self.gp is None:
@@ -78,7 +78,9 @@ class GPUCB:
             self.y = y_t
             self.noise = noise_t
             self._init_gp(self.x, self.y, self.noise)
+            print(f" >>> Initializing GP with {self.x.shape}")
         else:
+            print(f" >>> Updating GP with {x_t.shape}")
             self.x = torch.cat([self.x, x_t], dim=0)
             self.y = torch.cat([self.y, y_t], dim=0)
             self.gp.set_train_data(self.x, self.y, strict=False)

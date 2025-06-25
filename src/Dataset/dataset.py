@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 
 class IRDataset(ABC):
-    def __init__(self, data_name, cache_path):
+    def __init__(self, data_name=None, cache_path=None):
         self.dataset = None
         self.question_sub = None
         self.passage_sub = None

@@ -9,6 +9,7 @@ from src.Dataset.nfcorpus import NfCorpus
 from src.Dataset.scidocs import Scidocs
 from src.Dataset.scifact import Scifact
 from src.Dataset.touche import Touche
+from src.Dataset.traveldest import TravelDest
 
 
 def handle_dataset(dataset_name, cache_path=None):
@@ -34,6 +35,8 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = Antique(cache_path=cache_path)
     elif dataset_name == "news":
         dataset = News(cache_path=cache_path)
+    elif dataset_name == "traveldest":
+        dataset = TravelDest(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset
