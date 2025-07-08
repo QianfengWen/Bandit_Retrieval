@@ -21,6 +21,9 @@ class _ExactGPModel(gpytorch.models.ExactGP):
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
+    def transform_inputs(self, X):
+        return X
+
 
 class GPUCB:
     def __init__(self,
@@ -35,9 +38,14 @@ class GPUCB:
                  ):
 
         self.x = None
+        self.y = None
+        self.y_norm = None
+        self.y_mean = None
+        self.y_std = None
         self.noise = None
         self.dtype = torch.double
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.verbose = verbose
 
         self.beta = (torch.tensor(beta, dtype=self.dtype, device=self.device))
         self.alpha = alpha
@@ -76,14 +84,19 @@ class GPUCB:
         if self.gp is None:
             self.x = x_t
             self.y = y_t
+            self.y_norm = y_t
             self.noise = noise_t
             self._init_gp(self.x, self.y, self.noise)
-            print(f" >>> Initializing GP with {self.x.shape}")
         else:
-            print(f" >>> Updating GP with {x_t.shape}")
             self.x = torch.cat([self.x, x_t], dim=0)
             self.y = torch.cat([self.y, y_t], dim=0)
-            self.gp.set_train_data(self.x, self.y, strict=False)
+
+            self.y_mean = self.y.mean()
+            self.y_std = self.y.std()
+            self.y_norm = (self.y - self.y_mean) / (self.y_std + 1e-12)
+            # self.y_norm = self.y
+
+            self.gp.set_train_data(self.x, self.y_norm, strict=False)
 
             if isinstance(self.likelihood, FixedNoiseGaussianLikelihood):
                 self.likelihood.noise_covar.noise = torch.cat(
@@ -119,7 +132,7 @@ class GPUCB:
         for i in range(warmup_steps):
             adam.zero_grad()
             output = self.gp(self.x)
-            loss = -self.mll(output, self.y)
+            loss = -self.mll(output, self.y_norm)
             loss.backward()
             adam.step()
 
@@ -134,7 +147,7 @@ class GPUCB:
 
     def _init_gp(self,train_x, train_y, train_noise=None):
         # set kernel (ard, length_scale)
-        ls_prior = UniformPrior(1e-10, 30)
+        ls_prior = UniformPrior(1e-5, 30)
         length_constraint = Interval(lower_bound=1e-5, upper_bound=1e2, initial_value=self.length_scale if self.length_scale is not None else 1)
         base_kernel = RBFKernel(lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
         kernel = ScaleKernel(base_kernel, outputscale_prior=GammaPrior(2.0, 0.15),).to(self.device, dtype=self.dtype)
@@ -165,6 +178,7 @@ class GPUCB:
         self.fit()
         mean, _ = self.predict(candidates)
         top_k_scores, top_k_indices = torch.topk(mean, k=k)
+        top_k_scores = top_k_scores * (self.y_std + 1e-12) + self.y_mean if self.y_mean is not None else top_k_scores
         if return_scores:
             return top_k_indices, top_k_scores
         return top_k_indices

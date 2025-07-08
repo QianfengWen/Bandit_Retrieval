@@ -60,9 +60,9 @@ def main(dataset_name, model_name, top_k_passages, args):
 def arg_parser():
     parser = argparse.ArgumentParser(description='Reranking with LLM')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')
-    parser.add_argument("--llm_name", type=str)
+    parser.add_argument("--llm_name", type=str, required=True)
     parser.add_argument('--llm_budget', type=int, default=100, help='top k passages for reranking')
-    parser.add_argument("--prompt_type", type=str)
+    parser.add_argument("--prompt_type", type=str, required=True)
     parser.add_argument("--score_type", type=str, choices=['er', 'pr'], default='er')
 
     parser.add_argument('--emb_model', type=str, default='all-MiniLM-L6-v2', help='embedding model')

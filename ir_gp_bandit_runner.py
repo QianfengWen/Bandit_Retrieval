@@ -29,8 +29,8 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
 
     if args.debug:
         print("\n > DEBUG MODE")
-        query_ids = query_ids[:1]
-        queries = queries[:1]
+        query_ids = query_ids[6]
+        queries = queries[6]
         print(f" >> Query IDs: {query_ids}")
         print(f" >> Queries: {queries}")
 

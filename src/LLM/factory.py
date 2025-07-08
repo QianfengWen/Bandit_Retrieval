@@ -3,8 +3,9 @@ def handle_llm(llm_name, prompt_type=None, score_type=None):
     if llm_name is None:
         raise NotImplementedError ("No LLM name provided")
 
-    elif "chatgpt" in llm_name.lower():
-        raise NotImplementedError ("ChatGPT is not supported in this version")
+    elif llm_name == "openai/gpt4o":
+        from .gpt4o import gpt4o
+        llm = gpt4o(prompt_type=prompt_type, score_type=score_type)
 
     elif llm_name == 'unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit':
         from .llama3 import Llama3

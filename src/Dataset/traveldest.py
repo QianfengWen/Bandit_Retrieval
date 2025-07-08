@@ -9,7 +9,7 @@ from src.Dataset.dataset import IRDataset
 
 class TravelDest(IRDataset):
     def __init__(self, cache_path=None):
-        super().__init__(cache_path)
+        super().__init__(cache_path=cache_path)
         self.data_path = (Path(__file__).parent / '..' / '..' / 'data' / 'traveldest').resolve()
 
 
@@ -18,15 +18,16 @@ class TravelDest(IRDataset):
         question_map = dict()
 
         with open(query_path, 'r', encoding='utf-8') as f:
-            for line in tqdm(f, desc="Loading Queries"):
+            for line in tqdm(f, desc="Loading Only 10 Sampled Queries"):
                 parts = line.strip().split('\t')
                 query_id, text = parts[0], parts[1]
-                question_map[text] = query_id
+                # TODO
+                if int(query_id) < 10:
+                    question_map[query_id] = text
 
-        question_ids = list(map(str, question_map.values()))
-        question_texts = list(question_map.keys())
-
-        print(f" >>> Loaded {len(question_ids)} queries from {query_path}")
+        print(" >>> Sampling queries for testing purposes")
+        question_ids = list(question_map.keys())
+        question_texts = list(question_map.values())
 
         return question_ids, question_texts
 

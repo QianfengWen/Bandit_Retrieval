@@ -72,10 +72,10 @@ class LLM(abc.ABC):
             update_cache: Path to the CSV file to update with new results. If provided, the results will be written to the CSV file.
             verbose: Whether to print debug information.
         """
-        if cache and (len(queries) == 1) and (len(passages) == 1):
-            qid, pid = query_ids[0], passage_ids[0]
-            if pid in cache.get(qid, {}):
-                return [cache[qid][pid][self.score_type]], [cache[qid][pid]['logit']]
+        # if cache and (len(queries) == 1) and (len(passages) == 1):
+        #     qid, pid = query_ids[0], passage_ids[0]
+        #     if pid in cache.get(qid, {}):
+        #         return [cache[qid][pid][self.score_type]], [cache[qid][pid]['logit']]
 
         batch_qps = [(q, p) for q, p in zip(queries, passages)]
         logit = self.get_logit(batch_qps)

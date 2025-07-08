@@ -51,7 +51,7 @@ def gp_bandit_retrieval_optimized(
     if acq_func == "ucb":
         bandit = GPUCB(beta=beta, alpha=alpha,
                        alpha_method=alpha_method, train_alpha=train_alpha,
-                       ard=ard, length_scale=length_scale)
+                       ard=ard, length_scale=length_scale, verbose=verbose)
     else:
         raise ValueError(f"Invalid acquisition function: {acq_func}")
 
@@ -131,11 +131,15 @@ def gp_bandit_retrieval_optimized(
         selected_passage = [passages[j.item()] for j in selected_idx]
         selected_id = [passage_ids[j.item()] for j in selected_idx]
 
+        if verbose:
+            print(f" >>> Selected passages: {selected_id}")
         # Check cache for cold start passages
         cached = get_cache(cache, query_id, selected_id[0]) # assert sequential update
         if cached is not None:
             selected_score, selected_logit = cached[score_type], cached["logit"]
             cold_scores[selected_idx] = float(cached[score_type])
+            if verbose:
+                print(f" >>>> Cached score for {selected_id[0]}: {selected_score}")
             bandit.update(passage_embeddings_t[selected_idx], float(selected_score), selected_logit)
         else:
             if offline:

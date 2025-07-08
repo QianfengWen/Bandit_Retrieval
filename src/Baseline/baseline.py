@@ -75,7 +75,6 @@ def llm_rerank(
             return sorted_passages, sorted_scores
         return sorted_passages, None
     else:
-        print("Please run llm_baseline_runner.py to generate LLM scores for the query")
-        return None, None
-    
+        raise ValueError("Cache is not provided. Please run llm_label_runner.py to generate LLM scores for the query.")
+
     
