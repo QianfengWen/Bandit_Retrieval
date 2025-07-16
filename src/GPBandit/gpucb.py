@@ -13,7 +13,7 @@ from torch.optim import Adam
 class _ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, x, y, likelihood, kernel):
         super().__init__(x, y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
+        self.mean_module = gpytorch.means.ZeroMean()
         self.covar_module = kernel
 
     def forward(self, x):
