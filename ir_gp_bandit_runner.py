@@ -15,10 +15,10 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         configs = dict(vars(args))
         configs['runner'] = MODE
         run = wandb.init(
-            project="bandit_gpucb",
+            project="bandit_wsdm",
             config=configs,
             group=args.wandb_group,
-            tags=["gpytorch"]
+            tags=["gpytorch", str(args.seed), "batch"]
         )
     else:
         run = None

@@ -47,7 +47,7 @@ class GPUCB:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.verbose = verbose
 
-        self.beta = (torch.tensor(beta, dtype=self.dtype, device=self.device))
+        self.beta = torch.tensor(beta, dtype=self.dtype)
         self.alpha = alpha
         self.alpha_method = alpha_method
         self.train_alpha = train_alpha
@@ -107,7 +107,6 @@ class GPUCB:
 
     @torch.no_grad()
     def predict(self, candidates):
-        # TODO: Make it a batch prediction
         self.gp.eval()
         self.likelihood.eval()
         c_t = torch.as_tensor(candidates, dtype=self.dtype, device=self.device)
@@ -117,6 +116,28 @@ class GPUCB:
         std = posterior.variance.clamp_min(1e-12).sqrt().to(self.dtype)
 
         return mean, std
+
+    @torch.no_grad()
+    def batch_predict(self, candidates, batch_size=400000):
+        self.gp.eval()
+        self.likelihood.eval()
+
+        c_t = torch.as_tensor(candidates, dtype=self.dtype, device='cpu')  # keep on CPU initially
+        means, stds = [], []
+
+        with gpytorch.settings.fast_pred_var():
+            for i in range(0, c_t.size(0), batch_size):
+                batch = c_t[i:i + batch_size].to(self.device)
+
+                posterior = self.gp(batch)
+                mean = posterior.mean.to('cpu', dtype=self.dtype)  # move back to CPU
+                std = posterior.variance.clamp_min(1e-12).sqrt().to('cpu', dtype=self.dtype)
+
+                means.append(mean)
+                stds.append(std)
+
+        return torch.cat(means, dim=0), torch.cat(stds, dim=0)
+
 
     def fit(self):
         if not self.dirty:
@@ -176,9 +197,9 @@ class GPUCB:
 
     def get_top_k(self, candidates, k=1, return_scores=False):
         self.fit()
-        mean, _ = self.predict(candidates)
+        mean, _ = self.batch_predict(candidates)
         top_k_scores, top_k_indices = torch.topk(mean, k=k)
-        top_k_scores = top_k_scores * (self.y_std + 1e-12) + self.y_mean if self.y_mean is not None else top_k_scores
+        top_k_scores = top_k_scores * (self.y_std.to('cpu')+ 1e-12) + self.y_mean.to('cpu') if self.y_mean is not None else top_k_scores
         if return_scores:
             return top_k_indices, top_k_scores
         return top_k_indices
@@ -186,7 +207,7 @@ class GPUCB:
     def select(self, candidates, n=1):
         self.fit()
 
-        mu, sigma = self.predict(candidates)
+        mu, sigma = self.batch_predict(candidates)
         ucb = mu + torch.sqrt(self.beta) * sigma
         return torch.topk(ucb, n).indices
 

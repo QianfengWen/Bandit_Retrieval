@@ -55,15 +55,15 @@ def gp_bandit_retrieval_optimized(
     else:
         raise ValueError(f"Invalid acquisition function: {acq_func}")
 
-    query_embedding_t = torch.tensor(query_embedding, dtype=dtype, device=device)
-    passage_embeddings_t = torch.tensor(passage_embeddings, dtype=dtype, device=device)
+    query_embedding_t = torch.tensor(query_embedding, dtype=dtype)
+    passage_embeddings_t = torch.tensor(passage_embeddings, dtype=dtype)
 
     if use_query:
         bandit.update(query_embedding_t, 3, None)
 
-    all_indices = torch.arange(passage_embeddings_t.size(0), device=device)
-    cold_scores = torch.full((len(passages),), float('-inf'), dtype=dtype, device=device)
-    bandit_scores = torch.full((len(passages),), float('-inf'), dtype=dtype, device=device)
+    all_indices = torch.arange(passage_embeddings_t.size(0))
+    cold_scores = torch.full((len(passages),), float('-inf'), dtype=dtype)
+    bandit_scores = torch.full((len(passages),), float('-inf'), dtype=dtype)
 
     ########## Cold Start ##########
     if k_cold_start > 0:
@@ -105,10 +105,10 @@ def gp_bandit_retrieval_optimized(
                     cold_scores[j] = float(s)
                     bandit.update(passage_embeddings_t[j], float(s), logit)
 
-        avail_mask = torch.ones(len(passages), dtype=torch.bool, device=device)
+        avail_mask = torch.ones(len(passages), dtype=torch.bool)
         avail_mask[cold_start_idx] = False
     else:
-        avail_mask = torch.ones(len(passages), dtype=torch.bool, device=device)
+        avail_mask = torch.ones(len(passages), dtype=torch.bool)
 
     if verbose:
         print(f" >> Cold start scores: {cold_scores[~avail_mask].tolist()}")
