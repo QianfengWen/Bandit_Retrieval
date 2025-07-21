@@ -6,6 +6,7 @@ from src.Dataset.dl20 import DL20
 from src.Dataset.fiqa import FiQA
 from src.Dataset.news import News
 from src.Dataset.nfcorpus import NfCorpus
+from src.Dataset.robust import Robust04
 from src.Dataset.scidocs import Scidocs
 from src.Dataset.scifact import Scifact
 from src.Dataset.touche import Touche
@@ -37,6 +38,8 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = News(cache_path=cache_path)
     elif dataset_name == "traveldest":
         dataset = TravelDest(cache_path=cache_path)
+    elif dataset_name == "robust":
+        dataset = Robust04(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset
