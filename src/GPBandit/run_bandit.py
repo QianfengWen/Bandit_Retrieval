@@ -40,8 +40,7 @@ def gp_bandit_retrieval_optimized(
         update_cache: str = None,
         verbose: bool = False
 ):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dtype = torch.float32
+    dtype = torch.float64
 
     if verbose:
         print(f"\n > Query {query_id}")

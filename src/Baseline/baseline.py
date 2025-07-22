@@ -1,4 +1,5 @@
 import numpy as np
+from sentence_transformers import CrossEncoder
 
 from src.utils import cosine_similarity
 
@@ -7,7 +8,7 @@ def dense_retrieval(
         query_embedding,
         passage_ids: list[str],
         passage_embeddings,
-        top_k_passages: int,
+        cutoff: int,
         return_score: bool=False,
     ):
     """
@@ -16,11 +17,11 @@ def dense_retrieval(
         query_embedding: The embedding of the query.
         passage_ids (list): List of passage IDs.
         passage_embeddings : Passage embeddings.
-        top_k_passages (int): Number of passages to retrieve.
+        cutoff (int): Number of passages to retrieve.
         return_score (bool): Whether to return the scores.
     """
     sim_matrix = cosine_similarity(query_embedding, passage_embeddings)
-    top_k_idx = np.argsort(sim_matrix)[::-1][:top_k_passages]
+    top_k_idx = np.argsort(sim_matrix)[::-1][:cutoff]
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
     if return_score:
@@ -29,13 +30,55 @@ def dense_retrieval(
         return top_k_ids, top_k_scores
     return top_k_ids, None
 
+def cross_encoder(
+        query: str,
+        query_embedding,
+        passages: list[str],
+        passage_ids: list[str],
+        passage_embeddings,
+        cutoff: int,
+        return_score: bool=False,
+    ):
+    pid2p = {pid: p for pid, p in zip(passage_ids, passages)}
+    passage_ids, dense_score = dense_retrieval(
+        query_embedding=query_embedding,
+        passage_ids=passage_ids,
+        passage_embeddings=passage_embeddings,
+        cutoff=cutoff,
+        return_score=True
+    )
+
+    assert len(passage_ids) == cutoff
+    dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
+
+    qp_pair = [[query, pid2p[pid]] for pid in passage_ids]
+    ce_score = []
+
+    model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+    for i in range(0, len(qp_pair), 32):
+        batch = qp_pair[i:i + 32]
+        ce_score.extend(model.predict(batch, convert_to_numpy=True).tolist())
+
+    sorted_item = sorted(
+        zip(passage_ids, ce_score),
+        key=lambda x: (x[1], dense_score_dict[x[0]]),
+        reverse=True
+    )[:cutoff]
+    sorted_passages = [key for key, _ in sorted_item]
+    assert set(sorted_passages) == set(passage_ids), "Sorted passages do not match the original passage IDs"
+    if return_score:
+        sorted_scores = [value for _, value in sorted_item]
+        return sorted_passages, sorted_scores
+    return sorted_passages, None
+
+
 
 def llm_rerank(
         query_id: str,
         query_embedding,
         passage_ids: list[str],
         passage_embeddings,
-        top_k_passages: int,
+        cutoff: int,
         score_type: str,
         return_score: bool=False, 
         cache: dict=None    
@@ -47,7 +90,7 @@ def llm_rerank(
         query_id (str): The query ID.
         passage_embeddings : Passage embeddings.
         query_embedding : Query embedding.
-        top_k_passages (int): Number of passages to retrieve.
+        cutoff (int): Number of passages to retrieve.
         score_type (str): Type of score to use for reranking.
         return_score (bool): Whether to return the scores.
         cache (dict): Cache for storing LLM scores.
@@ -57,19 +100,21 @@ def llm_rerank(
         query_embedding=query_embedding,
         passage_ids=passage_ids,
         passage_embeddings=passage_embeddings,
-        top_k_passages=top_k_passages,
+        cutoff=cutoff,
         return_score=True
     )
-    assert len(passage_ids) == top_k_passages
+
+    assert len(passage_ids) == cutoff
     dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
     if cache:
         assert str(query_id) in cache, f"Query ID {query_id} not found in cache"
         valid_cached_items = {
             pid: llm_output[score_type] for pid, llm_output in cache[str(query_id)].items() if pid in passage_ids
         }
-        assert len(valid_cached_items) == top_k_passages, f"Expected {top_k_passages} valid cached items, but got {len(valid_cached_items)}"
-        sorted_item = sorted(valid_cached_items.items(), key=lambda x: (x[1], dense_score_dict[x[0]]), reverse=True)[:top_k_passages]
+        assert len(valid_cached_items) == cutoff, f"Expected {cutoff} valid cached items, but got {len(valid_cached_items)}"
+        sorted_item = sorted(valid_cached_items.items(), key=lambda x: (x[1], dense_score_dict[x[0]]), reverse=True)[:cutoff]
         sorted_passages = [key for key, _ in sorted_item]
+        assert set(sorted_passages) == set(passage_ids), "Sorted passages do not match the original passage IDs"
         if return_score:
             sorted_scores = [value for _, value in sorted_item]
             return sorted_passages, sorted_scores
@@ -77,4 +122,3 @@ def llm_rerank(
     else:
         raise ValueError("Cache is not provided. Please run llm_label_runner.py to generate LLM scores for the query.")
 
-    

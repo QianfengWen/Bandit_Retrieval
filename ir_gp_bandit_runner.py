@@ -122,7 +122,7 @@ def arg_parser():
     parser.add_argument("--nu", type=float, default=2.5, help='nu for Matern Kernel')
     parser.add_argument("--xi", type=float, default=0.05, help='xi for EI/PI')
 
-    parser.add_argument("--use_query", type=int, default=3, help="relevance of query")
+    parser.add_argument("--use_query", type=int, default=None, help="relevance of query")
     parser.add_argument("--normalize", action="store_true", help="normalize the passage embeddings")
     parser.add_argument("--ard", action="store_true", help="use ARD")
 
