@@ -1,6 +1,8 @@
+import random
 import numpy as np
 from sentence_transformers import CrossEncoder
 
+from src.Baseline.RankGPT.rankgpt import sliding_windows
 from src.utils import cosine_similarity
 
 
@@ -70,6 +72,53 @@ def cross_encoder(
         sorted_scores = [value for _, value in sorted_item]
         return sorted_passages, sorted_scores
     return sorted_passages, None
+
+def rankgpt(
+        query: str,
+        query_embedding,
+        passages: list[str],
+        passage_ids: list[str],
+        passage_embeddings,
+        llm,
+        cutoff: int,
+        window_size: int=20,
+        step: int=10,
+        verbose: bool=False
+    ):
+    pid2p = {pid: p for pid, p in zip(passage_ids, passages)}
+    p2pid = {p: pid for pid, p in zip(passage_ids, passages)}
+
+    passage_ids, dense_score = dense_retrieval(
+        query_embedding=query_embedding,
+        passage_ids=passage_ids,
+        passage_embeddings=passage_embeddings,
+        cutoff=cutoff,
+        return_score=True
+    )
+    assert len(passage_ids) == cutoff
+
+    combined = list(zip(passage_ids, dense_score))
+    random.shuffle(combined)
+    passage_ids, dense_score = zip(*combined)
+
+    item = {
+        'query': query,
+        'hits': [
+            {'content': pid2p[pid]} for pid in passage_ids
+        ]
+    }
+    reranked_item = sliding_windows(
+        item=item,
+        llm=llm,
+        rank_start=0,
+        rank_end=cutoff,
+        window_size=window_size,
+        step=step,
+        verbose=verbose
+    )
+    reranked_passages = [p2pid[hit['content']] for hit in reranked_item['hits']]
+
+    return reranked_passages
 
 
 

@@ -3,9 +3,9 @@ import csv
 import os
 from pathlib import Path
 
+from unsloth import FastLanguageModel
 import torch
 from filelock import FileLock
-from unsloth import FastLanguageModel
 
 class LLM(abc.ABC):
     """

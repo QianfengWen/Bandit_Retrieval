@@ -34,7 +34,7 @@ def main(dataset_name, model_name, args):
             query_embedding=query_embedding,
             passage_ids=passage_ids,
             passage_embeddings=passage_embeddings,
-            top_k_passages=max(args.cutoff),
+            cutoff=max(args.cutoff),
             return_score=True
         )
 
