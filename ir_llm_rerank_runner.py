@@ -37,7 +37,7 @@ def main(dataset_name, model_name, top_k_passages, args):
             query_embedding=query_embedding,
             passage_ids=passage_ids,
             passage_embeddings=passage_embeddings,
-            top_k_passages=top_k_passages,
+            cutoff=top_k_passages,
             score_type=args.score_type,
             cache=cache,
         )

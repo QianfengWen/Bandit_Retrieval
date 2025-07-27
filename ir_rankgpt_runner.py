@@ -30,7 +30,8 @@ def main(dataset_name, model_name, top_k_passages, args):
         from src.Baseline.RankGPT.llm import RankQwen
         llm = RankQwen()
     elif args.llm_name == "openai/gpt4o":
-        raise NotImplementedError("This function should be implemented")
+        from src.Baseline.RankGPT.llm import RankGPT4o
+        llm = RankGPT4o()
     else:
         raise ValueError(f"Unsupported model name: {args.llm_name}")
 
@@ -65,6 +66,7 @@ def main(dataset_name, model_name, top_k_passages, args):
         os.makedirs(f"results/{dataset_name}/", exist_ok=True)
         with open(f"results/{dataset_name}/{run.name}.json", "w", encoding="utf-8") as f:
             json.dump(results, f, indent=1, ensure_ascii=False)
+
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='Reranking with RankGPT')
