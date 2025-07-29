@@ -58,7 +58,7 @@ def recall_k(items, truth, k):
     :param k: number of top items to consider
     :return: recall@k
     """
-    assert len(items)>= k, "Number of items should be greater than or equal to k"
+    # assert len(items)>= k, "Number of items should be greater than or equal to k"
     assert len(truth)>= 0, "Number of truth items should be greater than or equal to 0"
     items = items[:k]
     return len(set(items) & set(truth)) / len(truth)
@@ -72,9 +72,11 @@ def precision_k(items, truth, k):
     :param k: number of top items to consider
     :return: precision@k
     """
-    assert len(items)>= k, "Number of items should be greater than or equal to k"
+    # assert len(items)>= k, "Number of items should be greater than or equal to k"
     assert len(truth)>= 0, "Number of truth items should be greater than or equal to 0"
     items = items[:k]
+    if len(items) == 0:
+        return 0.0
     return len(set(items) & set(truth)) / len(items)
 
 

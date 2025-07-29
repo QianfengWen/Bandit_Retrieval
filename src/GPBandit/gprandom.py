@@ -3,23 +3,19 @@ import torch
 from src.GPBandit.basegp import BaseGP
 
 
-class GPUCB(BaseGP):
+class GPRandom(BaseGP):
     def __init__(self,
-                 beta=2.0,
+                 kernel='rbf',
                  alpha=0.001,
                  alpha_method=None,
                  train_alpha=False,
                  ard=False,
                  length_scale=1,
-                 kernel='rbf',
                  verbose=False
                  ):
         super().__init__(alpha, alpha_method, train_alpha, ard, length_scale, kernel, verbose)
-        self.beta = torch.tensor(beta, dtype=self.dtype)
 
     def select(self, candidates, n=1):
-        self.fit()
-
-        mu, sigma = self.batch_predict(candidates)
-        ucb = mu + torch.sqrt(self.beta) * sigma
-        return torch.topk(ucb, n).indices
+        # Randomly select n candidates from the provided candidates
+        indices = torch.randperm(candidates.size(0))[:n]
+        return indices

@@ -3,7 +3,12 @@ from typing import Optional
 import numpy as np
 import torch
 
+from src.GPBandit.basegp import BaseGP
+from src.GPBandit.gpei import GPEI
+from src.GPBandit.gppi import GPPI
+from src.GPBandit.gprandom import GPRandom
 from src.GPBandit.gpucb import GPUCB
+from src.GPBandit.thompson import GPThompson
 from src.utils import get_cache
 
 
@@ -51,8 +56,24 @@ def gp_bandit_retrieval_optimized(
         bandit = GPUCB(beta=beta, alpha=alpha,
                        alpha_method=alpha_method, train_alpha=train_alpha,
                        ard=ard, length_scale=length_scale, verbose=verbose)
+    elif acq_func == "ei":
+        bandit = GPEI(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
+                        ard=ard, length_scale=length_scale, verbose=verbose)
+    elif acq_func == "pi":
+        bandit = GPPI(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
+                      ard=ard, length_scale=length_scale, verbose=verbose)
+    elif acq_func == "thompson":
+        bandit = GPThompson(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
+                            ard=ard, length_scale=length_scale, verbose=verbose)
+    elif acq_func == "random":
+        bandit = GPRandom(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
+                      ard=ard, length_scale=length_scale, verbose=verbose)
+    elif acq_func == "greedy":
+        bandit = BaseGP(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
+                      ard=ard, length_scale=length_scale, verbose=verbose)
+        k_cold_start = llm_budget
     else:
-        raise ValueError(f"Invalid acquisition function: {acq_func}")
+        raise ValueError(f"Unknown acquisition function: {acq_func}")
 
     query_embedding_t = torch.tensor(query_embedding, dtype=dtype)
     passage_embeddings_t = torch.tensor(passage_embeddings, dtype=dtype)
