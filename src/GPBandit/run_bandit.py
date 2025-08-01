@@ -55,22 +55,22 @@ def gp_bandit_retrieval_optimized(
     if acq_func == "ucb":
         bandit = GPUCB(beta=beta, alpha=alpha,
                        alpha_method=alpha_method, train_alpha=train_alpha,
-                       ard=ard, length_scale=length_scale, verbose=verbose)
+                       ard=ard, length_scale=length_scale, kernel=kernel, verbose=verbose)
     elif acq_func == "ei":
         bandit = GPEI(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
-                        ard=ard, length_scale=length_scale, verbose=verbose)
+                        ard=ard, length_scale=length_scale, kernel=kernel, verbose=verbose)
     elif acq_func == "pi":
         bandit = GPPI(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
-                      ard=ard, length_scale=length_scale, verbose=verbose)
+                      ard=ard, length_scale=length_scale, kernel=kernel, verbose=verbose)
     elif acq_func == "thompson":
         bandit = GPThompson(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
-                            ard=ard, length_scale=length_scale, verbose=verbose)
+                            ard=ard, length_scale=length_scale, kernel=kernel, verbose=verbose)
     elif acq_func == "random":
         bandit = GPRandom(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
-                      ard=ard, length_scale=length_scale, verbose=verbose)
+                      ard=ard, length_scale=length_scale, kernel=kernel, verbose=verbose)
     elif acq_func == "greedy":
         bandit = BaseGP(alpha=alpha, alpha_method=alpha_method, train_alpha=train_alpha,
-                      ard=ard, length_scale=length_scale, verbose=verbose)
+                      ard=ard, length_scale=length_scale, kernel=kernel, verbose=verbose)
         k_cold_start = llm_budget
     else:
         raise ValueError(f"Unknown acquisition function: {acq_func}")

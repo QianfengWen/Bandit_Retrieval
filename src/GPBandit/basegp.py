@@ -4,12 +4,26 @@ import gpytorch
 import torch
 from botorch import fit_gpytorch_mll
 from gpytorch.constraints import Interval
-from gpytorch.kernels import RBFKernel, ScaleKernel
+from gpytorch.kernels import RBFKernel, ScaleKernel, Kernel
 from gpytorch.likelihoods import FixedNoiseGaussianLikelihood, GaussianLikelihood
 from gpytorch.priors import UniformPrior, GammaPrior
 from torch.optim import Adam
 
+class CosineSimilarityKernel(Kernel):
+    is_stationary = False
 
+    def __init__(self, **kwargs):
+        super().__init__(has_lengthscale=False, **kwargs)
+
+    def forward(self, x1, x2, diag=False, **params):
+        # Normalize to unit vectors
+        x1_norm = x1 / x1.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+        x2_norm = x2 / x2.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+
+        if diag:
+            return torch.ones(x1.size(0), dtype=x1.dtype, device=x1.device)
+        else:
+            return x1_norm @ x2_norm.transpose(-2, -1)
 
 class _ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, x, y, likelihood, kernel):
@@ -51,6 +65,7 @@ class BaseGP:
         self.train_alpha = train_alpha
         self.ard = ard
         self.length_scale = length_scale
+        self.kernel = kernel
 
         self.gp, self.likelihood, self.mll, self.opt = None, None, None, None
         self.dirty = False
@@ -168,8 +183,19 @@ class BaseGP:
         # set kernel (ard, length_scale)
         ls_prior = UniformPrior(1e-5, 30)
         length_constraint = Interval(lower_bound=1e-5, upper_bound=1e2, initial_value=self.length_scale if self.length_scale is not None else 1)
-        base_kernel = RBFKernel(lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
-        base_kernel.register_constraint('raw_lengthscale', length_constraint)
+        if self.kernel == 'matern':
+            base_kernel = gpytorch.kernels.MaternKernel(nu=2.5, lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
+            base_kernel.register_constraint('raw_lengthscale', length_constraint)
+        elif self.kernel == 'rbf':
+            base_kernel = RBFKernel(lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
+            base_kernel.register_constraint('raw_lengthscale', length_constraint)
+        elif self.kernel == 'linear':
+            base_kernel = gpytorch.kernels.LinearKernel()
+        elif self.kernel == 'cosine':
+            base_kernel = CosineSimilarityKernel()
+        else:
+            raise ValueError(f"Unknown kernel type: {self.kernel}")
+
         kernel = ScaleKernel(base_kernel, outputscale_prior=GammaPrior(2.0, 0.15),).to(self.device, dtype=self.dtype)
 
         # set likelihood (alpha)
