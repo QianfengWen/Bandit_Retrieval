@@ -11,6 +11,7 @@ from src.Dataset.scidocs import Scidocs
 from src.Dataset.scifact import Scifact
 from src.Dataset.touche import Touche
 from src.Dataset.traveldest import TravelDest
+from src.Dataset.signal import Signal
 
 
 def handle_dataset(dataset_name, cache_path=None):
@@ -40,6 +41,8 @@ def handle_dataset(dataset_name, cache_path=None):
         dataset = TravelDest(cache_path=cache_path)
     elif dataset_name == "robust":
         dataset = Robust04(cache_path=cache_path)
+    elif dataset_name == "signal":
+        dataset = Signal(cache_path=cache_path)
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     return dataset
