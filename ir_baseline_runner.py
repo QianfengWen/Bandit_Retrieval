@@ -55,15 +55,6 @@ def main(dataset_name, model_name, args):
         with open(f"results/{dataset_name}/{run.name}.json", "w", encoding="utf-8") as f:
             json.dump(results, f, indent=1, ensure_ascii=False)
 
-
-
-    if run is not None:
-        updated_dict = {}
-        for k, v in results.items():
-            new_key = str(k).replace("@", "/")
-            updated_dict[new_key] = v
-        wandb.log(updated_dict)
-
 def arg_parser():
     parser = argparse.ArgumentParser(description='IR-based baseline')
     parser.add_argument('--dataset_name', type=str, default='covid', help='dataset name')

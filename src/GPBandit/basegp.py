@@ -169,6 +169,7 @@ class BaseGP:
         ls_prior = UniformPrior(1e-5, 30)
         length_constraint = Interval(lower_bound=1e-5, upper_bound=1e2, initial_value=self.length_scale if self.length_scale is not None else 1)
         base_kernel = RBFKernel(lengthscale_prior=ls_prior, length_constraint=length_constraint, ard_num_dims=train_x.shape[-1] if self.ard else None)
+        base_kernel.register_constraint('raw_lengthscale', length_constraint)
         kernel = ScaleKernel(base_kernel, outputscale_prior=GammaPrior(2.0, 0.15),).to(self.device, dtype=self.dtype)
 
         # set likelihood (alpha)
