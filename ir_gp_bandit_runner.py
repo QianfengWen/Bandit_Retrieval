@@ -35,7 +35,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         print(f" >> Queries: {queries}")
 
         llm_budget = 10
-        k_cold_start = 5
+        k_cold_start = 10
 
     k_retrieval = max(args.cutoff)
     if args.offline:
@@ -47,7 +47,7 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
     print("\n")
     results = {}
     for query, q_id, q_emb in tqdm(zip(queries, query_ids, query_embeddings), desc=" > Bandit Ranking", total=len(queries)):
-        preds, scores, founds = gp_bandit_retrieval_optimized(
+        preds, scores, cold, bandit = gp_bandit_retrieval_optimized(
             query=query,
             query_id=q_id,
             query_embedding=q_emb,
@@ -86,7 +86,8 @@ def main(dataset_name, model_name, acq_func, beta, llm_budget, k_cold_start, ker
         results[q_id] = {
             "pred": preds,
             "score": scores,
-            "found": founds,
+            "cold": cold,
+            "bandit": bandit,
         }
     metric, results = evaluate(results, relevance_map, args.cutoff, threshold=dataset.relevance_threshold)
 

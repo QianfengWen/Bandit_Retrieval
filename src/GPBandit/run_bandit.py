@@ -128,6 +128,7 @@ def gp_bandit_retrieval_optimized(
         avail_mask = torch.ones(len(passages), dtype=torch.bool)
         avail_mask[cold_start_idx] = False
     else:
+        cold_start_idx = torch.tensor([], dtype=torch.long)
         avail_mask = torch.ones(len(passages), dtype=torch.bool)
 
     if verbose:
@@ -137,6 +138,7 @@ def gp_bandit_retrieval_optimized(
     if verbose:
         print(" >> Exploration-exploitation phase")
 
+    bandit_idx = []
     budget = llm_budget - k_cold_start
     for _ in range(0, budget, 1): # assert sequential update
         available_idx = all_indices[avail_mask]
@@ -146,6 +148,7 @@ def gp_bandit_retrieval_optimized(
         emb = passage_embeddings_t[available_idx]
         selected_local = bandit.select(emb, 1)
         selected_idx = available_idx[selected_local]
+        bandit_idx.append(selected_idx.item())
 
         avail_mask[selected_idx] = False
         selected_passage = [passages[j.item()] for j in selected_idx]
@@ -176,13 +179,9 @@ def gp_bandit_retrieval_optimized(
     top_k_idx, top_k_scores = bandit.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
     top_k_ids = [passage_ids[idx] for idx in top_k_idx]
 
+    del bandit
     if return_score:
-        all_scores = {
-            passage_ids[i]: float(score)
-            for i, score in enumerate(torch.maximum(cold_scores, bandit_scores))
-            if float(score) != float('-inf')
-        }
-        return top_k_ids, top_k_scores.tolist(), all_scores
+        return top_k_ids, top_k_scores.tolist(), cold_start_idx.tolist(), bandit_idx
 
     return top_k_ids
 

@@ -149,6 +149,9 @@ class BaseGP:
                 means.append(mean)
                 stds.append(std)
 
+                del posterior
+                torch.cuda.empty_cache()
+
         return torch.cat(means, dim=0), torch.cat(stds, dim=0)
 
 
