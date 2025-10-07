@@ -5,18 +5,23 @@ import numpy as np
 from tqdm import tqdm
 
 from src.Dataset.dataloader import handle_dataset
-from src.Retrieval.retrieval import dense_retrieval
+from src.Retrieval.retrieval import llm_rerank
 from src.Embedding.embedding import handle_embeddings
 from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
+from src.LLM.openrouter_llm import OpenRouterLLM
 
 
 def main(
     dataset_name="travel_dest",
     top_k_passages=3,
     fusion_mode="mean",
+    budget=100,
     embedder_name="all-MiniLM-L6-v2",
+    llm_model_name="openai/gpt-4o",
+    scoring_mode="expected_relevance",
+    cross_encoder_reranking=False,
 ):
-    """Run the dense retrieval baseline and persist evaluation metrics."""
+    """Run the LLM-based relevance scoring pipeline and store aggregated metrics."""
     dataset = handle_dataset(dataset_name)
 
     query_embeddings_path = f"data/{dataset_name}/{embedder_name}_query_embeddings.pkl"
@@ -30,7 +35,7 @@ def main(
         relevance_map,
         _,
         passage_city_map,
-        _,
+        cache,
     ) = dataset.load_data()
 
     query_embeddings, passage_embeddings = handle_embeddings(
@@ -41,6 +46,9 @@ def main(
         passages,
     )
 
+    llm = OpenRouterLLM(model_name=llm_model_name, score_mode=scoring_mode)
+    cache_path = f"data/{dataset_name}/cache.csv"
+
     k_values = range(10, 51, 10)
     fusion_mode_internal = "average" if fusion_mode == "mean" else fusion_mode
 
@@ -49,17 +57,26 @@ def main(
     map_k_dict = defaultdict(list)
     ndcg_k_dict = defaultdict(list)
 
-    print("=== Dense Retrieval Baseline ===")
-    for q_id, query_embedding in tqdm(
-        zip(question_ids, query_embeddings),
+    if cross_encoder_reranking:
+        print("Cross-encoder reranking is no longer supported and will be ignored.")
+
+    print("=== LLM Relevance Scoring ===")
+    for q_id, query_text, query_embedding in tqdm(
+        zip(question_ids, queries, query_embeddings),
         desc="Query",
         total=len(question_ids),
     ):
-        items, scores = dense_retrieval(
-            passage_ids,
-            passage_embeddings,
-            query_embedding,
-            k_retrieval=len(passage_ids),
+        items, scores = llm_rerank(
+            passage_ids=passage_ids,
+            passage_embeddings=passage_embeddings,
+            passages_text=passages,
+            query_embedding=query_embedding,
+            query_id=q_id,
+            query_text=query_text,
+            llm=llm,
+            k_retrieval=budget,
+            cache=cache,
+            update_cache=cache_path,
             return_score=True,
         )
 
@@ -100,21 +117,24 @@ def main(
         results[f"map@{k}"] = mean_map_k
         results[f"ndcg@{k}"] = mean_ndcg_k
 
-    output_dir = Path("output") / "baseline" / dataset_name
+    output_dir = Path("output") / "llm_score" / dataset_name
     output_dir.mkdir(parents=True, exist_ok=True)
-    result_path = output_dir / f"{embedder_name}_baseline_results.csv"
+    result_path = output_dir / f"{embedder_name}_llm_relevance_results.csv"
 
     configs = {
         "dataset": dataset_name,
         "embedder_name": embedder_name,
+        "llm_model_name": llm_model_name,
+        "scoring_mode": scoring_mode,
+        "budget": budget,
         "top_k_passages": top_k_passages,
         "fusion_mode": fusion_mode,
-        "retrieval_cutoff": len(passage_ids),
+        "realtime_labeling": True,
     }
 
     assert (
         save_results(configs, results, str(result_path)) is True
-    ), "Results not saved"
+    ), "Results not saved."
     print(f"Results saved to {result_path}")
 
 

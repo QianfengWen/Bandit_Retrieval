@@ -1,4 +1,5 @@
 import numpy as np
+from typing import List, Optional
 from src.GPUCB.gp import GaussianProcess
 from sklearn.gaussian_process import GaussianProcessRegressor
 from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
@@ -7,7 +8,7 @@ from tqdm import tqdm
 import random
 import time
 
-SAMPLE_STRATEGIES = ["random", "stratified", "city_random", "city_rank"]
+SAMPLE_STRATEGIES = ["random"]
 
 def calculate_cosine_similarity(query_embeddings, passage_embeddings):
     dot_product = np.dot(query_embeddings, passage_embeddings.T)
@@ -26,15 +27,14 @@ def calculate_cosine_similarity(query_embeddings, passage_embeddings):
     return similarity_matrix.flatten()
 
 def sample(
-        query_embedding, 
-        passage_ids, 
-        passage_embeddings, 
-        passage_dict, 
-        sample_strategy, 
-        sample_size=200, 
+        query_embedding,
+        passage_ids,
+        passage_embeddings,
+        sample_strategy,
+        sample_size=200,
         epsilon=0.5,
-        city_max_sample=1,
-        random_seed=42
+        random_seed=42,
+        tau=None,
     ):
     """
     Sample passages based on different strategies.
@@ -43,11 +43,10 @@ def sample(
         query_embedding (np.array): Query embedding vector.
         passage_ids (list): List of passage IDs.
         passage_embeddings (np.array): Matrix of passage embeddings.
-        passage_dict (dict): Mapping of city_id -> list of passage_ids.
-        sample_strategy (str): Sampling strategy ("random", "stratified", "city_random", "city_rank").
+        sample_strategy (str): Sampling strategy ("random", "stratified").
         sample_size (int): Total number of passages to sample.
         epsilon (float): Exploration factor (0 = pure exploitation, 1 = pure exploration).
-        city_max_sample (int): Maximum number of passages to sample per city (for city-based strategies).
+        tau (int, optional): If provided, only the top-τ dense-ranked passages are considered during exploration.
 
     Returns:
         list: List of sampled passage IDs.
@@ -59,13 +58,16 @@ def sample(
     random.seed(random_seed)
     np.random.seed(random_seed)
 
-    # Create a fast lookup from passage_id to index
-    id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
-
     # Step 1: Compute cosine similarity for ranking
     cosine_similarity_matrix = calculate_cosine_similarity(query_embedding, passage_embeddings)
     sorted_idx = np.argsort(cosine_similarity_matrix)[::-1]  # Descending order
-    sorted_scores = cosine_similarity_matrix[sorted_idx]
+
+    # Restrict exploration pool to top-τ dense rankings if provided
+    if tau is not None:
+        tau = max(0, min(int(tau), len(sorted_idx)))
+        candidate_idx = sorted_idx[:tau]
+    else:
+        candidate_idx = sorted_idx.copy()
 
     # Step 2: Split based on epsilon (handle boundary cases)
     if epsilon == 0:   # Pure exploitation
@@ -79,59 +81,38 @@ def sample(
         explore_k = sample_size - top_k
     
     # Exploitation step — take top-ranked passages
+    candidate_count = len(candidate_idx)
+    top_k = min(top_k, candidate_count)
+
     top_sampled_ids = []
     if top_k > 0:
-        top_sampled_ids = [passage_ids[idx] for idx in sorted_idx[:top_k]]
+        top_sampled_ids = [passage_ids[idx] for idx in candidate_idx[:top_k]]
 
     # Exploration step — handle remaining sampling based on strategy
-    remaining_idx = sorted_idx[top_k:]
-    remaining_ids = [passage_ids[idx] for idx in remaining_idx]
+    remaining_idx = candidate_idx[top_k:]
 
     explored_ids = []
     if explore_k > 0:
+        explore_pool = remaining_idx if len(remaining_idx) > 0 else candidate_idx[top_k:]
         if sample_strategy == "random":
             # Randomly sample from the remaining passages
-            sampled_idx = np.random.choice(
-                remaining_idx, 
-                size=min(explore_k, len(remaining_idx)), 
-                replace=False
-            )
-            explored_ids = [passage_ids[idx] for idx in sampled_idx]
+            if len(explore_pool) > 0:
+                sampled_idx = np.random.choice(
+                    explore_pool,
+                    size=min(explore_k, len(explore_pool)),
+                    replace=False
+                )
+                explored_ids = [passage_ids[idx] for idx in sampled_idx]
 
         elif sample_strategy == "stratified":
             # Split into roughly equal strata and sample from each
-            strata = np.array_split(remaining_idx, min(explore_k, len(remaining_idx)))
-            sampled_idx = [
-                np.random.choice(stratum, size=1)[0] 
-                for stratum in strata if len(stratum) > 0
-            ]
-            explored_ids = [passage_ids[idx] for idx in sampled_idx]
-
-        elif sample_strategy in ["city_random", "city_rank"]:
-            remaining_ids = []
-            for city_id, city_passage_ids in passage_dict.items():
-                valid_city_passage_ids = [pid for pid in city_passage_ids if pid in id_to_index]
-                if not valid_city_passage_ids:
-                    continue
-                
-                city_passage_idx = [id_to_index[pid] for pid in valid_city_passage_ids]
-                city_passage_embeddings = passage_embeddings[city_passage_idx]
-
-                if sample_strategy == "city_random":
-                    # Random sampling from each city
-                    explored_ids.extend(
-                        random.sample(valid_city_passage_ids, min(city_max_sample, len(valid_city_passage_ids)))
-                    )
-
-                # elif sample_strategy == "city_rank":
-                #     # Rank passages based on similarity within the city
-                #     city_cosine_similarity = calculate_cosine_similarity(query_embedding, city_passage_embeddings)
-                #     sorted_city_idx = np.argsort(city_cosine_similarity)[::-1][:city_max_sample]
-                #     rexplored_ids.extend([valid_city_passage_ids[idx] for idx in sorted_city_idx])
-
-            # Limit final sample size after city-based sampling
-            if len(explored_ids) > explore_k:
-                remaining_ids = random.sample(remaining_ids, explore_k)
+            if len(explore_pool) > 0:
+                strata = np.array_split(explore_pool, min(explore_k, len(explore_pool)))
+                sampled_idx = [
+                    np.random.choice(stratum, size=1)[0]
+                    for stratum in strata if len(stratum) > 0
+                ]
+                explored_ids = [passage_ids[idx] for idx in sampled_idx]
 
     # Combine exploitation and exploration samples
     sampled_ids = top_sampled_ids + explored_ids
@@ -163,7 +144,7 @@ def gp_retrieval(
         kernel: str = "rbf",
         llm_budget: int = 200, 
         epsilon: float = 0.5,
-        city_max_sample: int = 1,
+        tau: int = None,
         sample_strategy: str = "random",
         batch_size: int = 5, 
         cache: dict = None, 
@@ -194,7 +175,8 @@ def gp_retrieval(
         update_cache: Whether to update the cache (boolean or dictionary).
 
         top_k (int): Number of top passages to return.
-        sample_strategy (str): Sampling strategy ("random", "stratified", "city_random", "city_rank").
+        sample_strategy (str): Sampling strategy ("random", "stratified").
+        tau (int): Maximum number of dense-ranked passages considered for exploration.
 
         verbose (bool): Whether to print debug info.
 
@@ -221,12 +203,11 @@ def gp_retrieval(
         query_embedding=query_embedding,
         passage_ids=passage_ids,
         passage_embeddings=passage_embeddings,
-        passage_dict=passage_dict,
         sample_strategy=sample_strategy,
         sample_size=llm_budget,
         epsilon=epsilon,
-        city_max_sample=city_max_sample,
-        random_seed=random_seed
+        random_seed=random_seed,
+        tau=tau if tau is not None else len(passage_ids)
     )
 
     ############### Batch Processing ################
@@ -266,141 +247,6 @@ def gp_retrieval(
 
     ############### Return Results ################
     return gpucb
-
-def bandit_retrieval(
-        query: str, 
-        query_embedding: np.array, 
-        query_id: int,
-        passage_ids: list, 
-        passage_embeddings: np.array, 
-        passages: list, 
-        llm: LLM, 
-        kernel: str = "rbf",
-        acq_func="ucb",
-        k_cold_start: int=5, 
-        k_retrieval: int=1000,
-        beta=2.0, 
-        llm_budget: int=10, 
-        batch_size: int=10, 
-        verbose: bool=False, 
-        return_score: bool=False, 
-        cache: dict=None, 
-        update_cache: str=None
-    ):
-    """
-    Bandit retrieval using GP-UCB, based on embeddings of passages.
-    
-    Args:
-        passage_ids: List of passage IDs
-        passage_embeddings: List of passage embeddings
-        passages: List of passage texts
-        llm: LLM interface for scoring passages
-        query: Query text
-        query_embedding: Optional query embedding
-        query_id: Optional query ID for ground truth lookups
-        beta: Exploration-exploitation trade-off parameter
-        llm_budget: Number of LLM calls to make
-        k_cold_start: Number of random samples to collect initially
-        k_retrieval: Number of passages to retrieve at the end
-    
-    Returns:
-        List of passage IDs ranked by relevance
-    """
-    ############### Set up ################
-    if llm_budget < 1:
-        raise ValueError("LLM budget must be at least 1")
-    
-    k_cold_start = min(k_cold_start, llm_budget)
-    
-    gpucb = RetrievalGPUCB(beta=beta, kernel=kernel, acquisition_function=acq_func) # set up GP-UCB
-    
-    available_ids = passage_ids.copy()
-    id_to_embedding = {pid: emb for pid, emb in zip(passage_ids, passage_embeddings)}
-    
-    observed_ids = []
-    scores = {}
-    
-    ############### Cold start ################
-    cosine_similairty_matrix = calculate_cosine_similarity(query_embedding, passage_embeddings)
-    if query_embedding is not None and k_cold_start > 0:
-        cold_start_idx = np.argsort(cosine_similairty_matrix)[::-1][:k_cold_start]
-        cold_start_ids = [passage_ids[idx] for idx in cold_start_idx]
-
-        random.shuffle(cold_start_ids)
-        cold_start_batches = [cold_start_ids[i:i + batch_size] for i in range(0, len(cold_start_ids), batch_size)]
-        
-        for batch in cold_start_batches:
-            # remove batch items from available IDs
-            for target_id in batch:
-                available_ids.remove(target_id)
-            
-            # get passages corresponding to batch
-            passage_idxs = [passage_ids.index(target_id) for target_id in batch]
-            batch_passages = [passages[idx] for idx in passage_idxs]
-
-            # get relevance scores for the batch using LLM
-            batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=batch, cache=cache, update_cache=update_cache)
-            
-            # store observations
-            for target_id, score in zip(batch, batch_scores):
-                scores[target_id] = score
-                observed_ids.append(target_id)
-
-                # update GP-UCB model using the passage embedding as feature
-                gpucb.update(id_to_embedding[target_id], score)
-            
-            if verbose: # debug print
-                print("batch_scores: ", batch_scores)
-
-                for score, passage in zip(batch_scores, batch_passages):
-                    try:
-                        print(f"Score: {score}, Passage: {passage}")
-                    except UnicodeEncodeError:
-                        print(f"Score: {score}, Passage: {passage.encode('ascii', 'replace').decode()}")
-    
-    ############### Exploration-exploitation ################
-    num_iterations = (llm_budget - k_cold_start) // batch_size 
-
-    # use GP-UCB to select passages in batches
-    for _ in tqdm(range(num_iterations), desc="Bandit Retrieval"):
-        if not available_ids:
-            break  
-
-        available_embeddings = [id_to_embedding[pid] for pid in available_ids]
-        
-        next_embedding_idxs = gpucb.select(available_embeddings, batch_size) 
-        next_ids = [available_ids[idx] for idx in next_embedding_idxs] 
-
-        for next_id in next_ids:
-            available_ids.remove(next_id)
-
-        passage_idxs = [passage_ids.index(next_id) for next_id in next_ids]
-        batch_passages = [passages[idx] for idx in passage_idxs]
-
-        batch_scores = llm.get_score(query, batch_passages, query_id=query_id, passage_ids=next_ids, cache=cache, update_cache=update_cache)
-
-        for next_id, score in zip(next_ids, batch_scores):
-            scores[next_id] = score
-            observed_ids.append(next_id)
-            gpucb.update(id_to_embedding[next_id], score)  # Update model
-        
-        if verbose: # debug print
-            print("batch_scores: ", batch_scores)
-
-            for score, passage in zip(batch_scores, batch_passages):
-                try:
-                    print(f"Score: {score}, Passage: {passage}")
-                except UnicodeEncodeError:
-                    print(f"Score: {score}, Passage: {passage.encode('ascii', 'replace').decode()}")
-
-    # return the top-k passages based on final GP predictions
-    top_k_idx, top_k_scores = gpucb.get_top_k(passage_embeddings, k_retrieval, return_scores=return_score)
-    top_k_ids = [passage_ids[idx] for idx in top_k_idx]
-
-    if return_score:
-        return top_k_ids, top_k_scores, observed_ids
-
-    return top_k_ids
     
 def dense_retrieval(
         passage_ids: list, 
@@ -423,61 +269,87 @@ def dense_retrieval(
 
 
 def llm_rerank(
-        passage_ids: list[int], 
-        passage_embeddings: list, 
-        query_embedding, 
-        query_id: int, 
-        k_retrieval: int=1000,
-        return_score: bool=False, 
-        cache: dict=None    
+        passage_ids: List[int],
+        passage_embeddings: list,
+        passages_text: List[str],
+        query_embedding,
+        query_id: int,
+        query_text: Optional[str] = None,
+        llm: Optional[LLM] = None,
+        k_retrieval: int = 1000,
+        return_score: bool = False,
+        cache: Optional[dict] = None,
+        update_cache: Optional[str] = None,
     ):
     """
-    rerank using LLM; append dense results beyond k_retrieval without reranking
+    Rerank using LLM scores when available; falls back to dense scores otherwise.
     """
+    passage_lookup = {pid: text for pid, text in zip(passage_ids, passages_text)}
+
     # Step 1: Retrieve top N (>= k_retrieval) with dense retrieval
-    passage_ids, dense_score = dense_retrieval(
-        passage_ids, passage_embeddings, query_embedding, 
-        k_retrieval=max(k_retrieval * 2, len(passage_ids)), return_score=True
+    dense_ids, dense_score = dense_retrieval(
+        passage_ids,
+        passage_embeddings,
+        query_embedding,
+        k_retrieval=max(k_retrieval * 2, len(passage_ids)),
+        return_score=True,
     )
     
     # Build dense score dict for all
-    dense_score_dict = {pid: score for pid, score in zip(passage_ids, dense_score)}
+    dense_score_dict = {pid: score for pid, score in zip(dense_ids, dense_score)}
     
     # Separate top-k for reranking and rest
-    top_k_passages = passage_ids[:k_retrieval]
-    rest_passages = passage_ids[k_retrieval:]
+    top_k_passages = dense_ids[:k_retrieval]
+    rest_passages = dense_ids[k_retrieval:]
 
-    if cache:
-        try:
-            valid_cached_items = {
-                pid: score for pid, score in cache[query_id].items() if pid in top_k_passages
-            }
-            # Use dense_score_dict as tiebreaker
-            sorted_item = sorted(
-                valid_cached_items.items(), 
-                key=lambda x: (x[1], dense_score_dict[x[0]]), 
-                reverse=True
-            )
-            reranked_passages = [int(pid) for pid, _ in sorted_item]
-            reranked_scores = [score for _, score in sorted_item]
-            
-            # Fill in any missing top-k passages not found in cache
-            remaining_in_top_k = [pid for pid in top_k_passages if pid not in valid_cached_items]
-            reranked_passages += remaining_in_top_k
-            reranked_scores += [dense_score_dict[pid] for pid in remaining_in_top_k]
+    llm_scores = {}
+    if cache is not None and query_id is not None:
+        query_cache = cache.get(query_id, {})
+        llm_scores = {pid: query_cache[pid] for pid in top_k_passages if pid in query_cache}
 
-            # Append the rest of the dense results
-            final_passages = reranked_passages + rest_passages
-            if return_score:
-                final_scores = reranked_scores + [dense_score_dict[pid] for pid in rest_passages]
-                return final_passages, final_scores
-            return final_passages
-        except:
-            pass
+    missing_passages = [pid for pid in top_k_passages if pid not in llm_scores]
+    if missing_passages and llm is not None and query_text is not None:
+        passages_for_llm = [passage_lookup.get(pid, "") for pid in missing_passages]
+        llm_scores_new = llm.get_score(
+            query=query_text,
+            passages=passages_for_llm,
+            query_id=query_id,
+            passage_ids=missing_passages,
+            cache=cache,
+            update_cache=update_cache,
+        )
+        if cache is not None and query_id is not None:
+            query_cache = cache.get(query_id, {})
+            llm_scores.update({
+                pid: query_cache.get(pid, score)
+                for pid, score in zip(missing_passages, llm_scores_new)
+            })
+        else:
+            llm_scores.update({pid: score for pid, score in zip(missing_passages, llm_scores_new)})
 
-    print(f"Cache miss for query {query_id}, using LLM ...")
-    print("Please run llm_baseline_runner.py to generate LLM scores for the query")
-    return passage_ids[:k_retrieval]  # fallback
+    # Combine scores, falling back to dense retrieval values where needed
+    rerank_scores = {}
+    for pid in top_k_passages:
+        score = llm_scores.get(pid)
+        if score is None or score < 0:
+            score = dense_score_dict[pid]
+        rerank_scores[pid] = score
+
+    sorted_top = sorted(
+        top_k_passages,
+        key=lambda pid: (rerank_scores[pid], dense_score_dict[pid]),
+        reverse=True,
+    )
+
+    final_passages = sorted_top + rest_passages
+    if return_score:
+        final_scores = (
+            [rerank_scores[pid] for pid in sorted_top]
+            + [dense_score_dict[pid] for pid in rest_passages]
+        )
+        return final_passages, final_scores
+
+    return final_passages
 
 def cross_encoder_rerank(
         passage_ids: list[int], 
