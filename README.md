@@ -1,4 +1,4 @@
-# Natural Language Recommendation via Multimodal Item Scoring Using Gaussian Process Regression with LLM Relevance Judgments
+# Multimodal Item Scoring for Natural Language Recommendation via Gaussian Process Regression with LLM Relevance Judgments
 ---
 
 ## ⚠️ Repository Setup
