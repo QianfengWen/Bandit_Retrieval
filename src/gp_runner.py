@@ -5,11 +5,11 @@ import json
 import numpy as np
 from tqdm import tqdm
 
-from src.Retrieval.retrieval import gp_retrieval
-from src.LLM.openrouter_llm import OpenRouterLLM
-from src.Dataset.dataloader import handle_dataset
-from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import fusion_score_gp, eval_rec, save_results
+from .Retrieval.retrieval import gp_retrieval
+from .LLM.openrouter_llm import OpenRouterLLM
+from .Dataset.dataloader import handle_dataset
+from .Embedding.embedding import handle_embeddings
+from .RecUtils.rec_utils import fusion_score_gp, eval_rec, save_results
 
 
 def main(

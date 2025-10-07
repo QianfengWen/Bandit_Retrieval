@@ -1,12 +1,12 @@
 import numpy as np
 from typing import List, Optional
-from src.GPUCB.gp import GaussianProcess
 from sklearn.gaussian_process import GaussianProcessRegressor
-from src.GPUCB.retrieval_gpucb import RetrievalGPUCB
-from src.LLM.llm import LLM
 from tqdm import tqdm
 import random
 import time
+
+from ..GPR.gp import GaussianProcess
+from ..LLM.llm import LLM
 
 SAMPLE_STRATEGIES = ["random"]
 
@@ -37,19 +37,28 @@ def sample(
         tau=None,
     ):
     """
-    Sample passages based on different strategies.
+    Select a subset of passages to send to the LLM.
+
+    This helper first scores passages with dense retrieval and then performs an
+    epsilon-greedy split between exploitation (`1 - epsilon` fraction) and
+    exploration (`epsilon` fraction).  The optional ``tau`` parameter caps
+    exploration to the highest ranked dense candidates so that random sampling
+    never strays into the extreme tail of the retrieval list.
 
     Args:
-        query_embedding (np.array): Query embedding vector.
-        passage_ids (list): List of passage IDs.
-        passage_embeddings (np.array): Matrix of passage embeddings.
-        sample_strategy (str): Sampling strategy ("random", "stratified").
-        sample_size (int): Total number of passages to sample.
-        epsilon (float): Exploration factor (0 = pure exploitation, 1 = pure exploration).
-        tau (int, optional): If provided, only the top-τ dense-ranked passages are considered during exploration.
+        query_embedding (np.array): Embedding representation of the query.
+        passage_ids (list[int]): Identifiers for every candidate passage.
+        passage_embeddings (np.array): Embeddings aligned with ``passage_ids``.
+        sample_strategy (str): Strategy for the exploration portion
+            (``"random"`` or ``"stratified"``).
+        sample_size (int): Number of passages to return.
+        epsilon (float): Fraction of samples allocated to exploration.
+        random_seed (int): Seed used when sampling to ensure reproducibility.
+        tau (int, optional): Limits the exploration pool to the top ``tau`` dense
+            retrieval results.  Defaults to the full candidate list.
 
     Returns:
-        list: List of sampled passage IDs.
+        list[int]: Selected passage identifiers.
     """
     if sample_strategy not in SAMPLE_STRATEGIES:
         raise ValueError(f"Invalid sample strategy. Choose from: {SAMPLE_STRATEGIES}")
@@ -156,33 +165,37 @@ def gp_retrieval(
         length_scale: float = 1.0
     ):
     """
-    Perform GP-based retrieval using LLM for scoring.
+    Run the GP retrieval loop with LLM feedback.
+
+    The routine repeatedly samples passages with ``epsilon``-greedy exploration,
+    queries the LLM for relevance signals, and updates a Gaussian Process model
+    that produces the downstream ranking.
 
     Args:
-        query (str): Input query.
-        query_embedding (np.array): Query embedding.
-        query_id (int): Query ID.
-
-        passage_ids (list): List of passage IDs.
-        passage_embeddings (np.array): Matrix of passage embeddings.
-        passages (list): List of passage texts.
-        passage_dict (dict): Mapping of city_id -> list of passage_ids.
-
-        llm (LLM): LLM instance for scoring.
-        llm_budget (int): Maximum number of passages to query with LLM.
-        batch_size (int): Batch size for LLM calls.
-        cache (dict): Cache for LLM results.
-        update_cache: Whether to update the cache (boolean or dictionary).
-
-        top_k (int): Number of top passages to return.
-        sample_strategy (str): Sampling strategy ("random", "stratified").
-        tau (int): Maximum number of dense-ranked passages considered for exploration.
-
-        verbose (bool): Whether to print debug info.
+        query (str): Raw query text.
+        query_embedding (np.array): Embedding for ``query``.
+        query_id (int): Unique identifier for the query (used for caching).
+        passage_ids (list[int]): Identifiers for all candidate passages.
+        passage_embeddings (np.array): Embeddings aligned with ``passage_ids``.
+        passages (list[str]): Passage texts used for LLM prompting.
+        passage_dict (dict): Mapping from city IDs to passage IDs.
+        llm (LLM): Scoring function compatible with :class:`OpenRouterLLM`.
+        kernel (str): Kernel name for the GP model.
+        llm_budget (int): Number of LLM calls permitted for this query.
+        epsilon (float): Exploration rate for the sampler.
+        tau (int): Cap on the exploration pool; defaults to ``len(passage_ids)``.
+        sample_strategy (str): Strategy string forwarded to :func:`sample`.
+        batch_size (int): Number of passages sent to the LLM at once.
+        cache (dict): Optional cache of previously scored passages.
+        update_cache (str): Path used to persist newly collected labels.
+        verbose (bool): Print debugging details when True.
+        random_seed (int): Seed for reproducible sampling.
+        normalize_y (bool): Whether to normalise observations in the GP.
+        alpha (float): Observation noise term supplied to the GP.
+        length_scale (float): Kernel length-scale hyper-parameter.
 
     Returns:
-        list: Top-k passage IDs.
-        list (optional): Top-k scores if return_score is True.
+        GaussianProcess: Updated GP model containing the observed labels.
     """
 
     ############### Set Up ################
@@ -282,7 +295,28 @@ def llm_rerank(
         update_cache: Optional[str] = None,
     ):
     """
-    Rerank using LLM scores when available; falls back to dense scores otherwise.
+    Rerank passages for a query using LLM guidance.
+
+    The function first obtains dense retrieval scores, then replaces the top ``k``
+    scores with LLM-derived estimates when available.  Missing scores fall back to
+    dense retrieval ensuring the reranker always returns ``k_retrieval`` items.
+
+    Args:
+        passage_ids (list[int]): Identifiers for all passages.
+        passage_embeddings (np.array): Embeddings aligned with ``passage_ids``.
+        passages_text (list[str]): Text for each passage, used in the LLM prompt.
+        query_embedding (np.array): Embedding for the query.
+        query_id (int): Numerical identifier for caching.
+        query_text (str, optional): Raw query text for prompting the LLM.
+        llm (LLM, optional): Scoring model. Required for real-time scoring.
+        k_retrieval (int): Number of passages to surface.
+        return_score (bool): When True returns passages and their scores.
+        cache (dict, optional): Pre-computed LLM judgements.
+        update_cache (str, optional): CSV path for persisting new scores.
+
+    Returns:
+        list[int] | tuple[list[int], list[float]]: Reranked passage IDs, optionally
+        paired with their aggregated scores.
     """
     passage_lookup = {pid: text for pid, text in zip(passage_ids, passages_text)}
 

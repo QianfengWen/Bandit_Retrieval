@@ -1,35 +1,34 @@
 from abc import ABC, abstractmethod
-import matplotlib.pyplot as plt
-import os
-import json
 
-from src.Dataset.restaurant_phi import RestaurantPhi
-from src.Dataset.restaurant_nor import RestaurantNor
-from src.Dataset.travel_dest import TravelDest
-from src.Dataset.point_rec_us import PointRecUS
-from src.Dataset.hotel_chicago import HotelChicago
-from src.Dataset.hotel_london import HotelLondon
-from src.Dataset.hotel_montreal import HotelMontreal
-from src.Dataset.hotel_nyc import HotelNYC
+from .datasets import (
+    RestaurantPhiDataset,
+    RestaurantNorDataset,
+    TravelDestDataset,
+    PointRecUSDataset,
+    HotelChicagoDataset,
+    HotelLondonDataset,
+    HotelMontrealDataset,
+    HotelNYCDataset,
+)
 
 
 def handle_dataset(dataset_name):
     if dataset_name == "restaurant_phi":
-        dataset = RestaurantPhi()
+        dataset = RestaurantPhiDataset()
     elif dataset_name == "restaurant_nor":
-        dataset = RestaurantNor()
+        dataset = RestaurantNorDataset()
     elif dataset_name == "travel_dest":
-        dataset = TravelDest()
+        dataset = TravelDestDataset()
     elif dataset_name == "point_rec_us":
-        dataset = PointRecUS()
+        dataset = PointRecUSDataset()
     elif dataset_name == "hotel_chicago":
-        dataset = HotelChicago()
+        dataset = HotelChicagoDataset()
     elif dataset_name == "hotel_london":
-        dataset = HotelLondon()
+        dataset = HotelLondonDataset()
     elif dataset_name == "hotel_montreal":
-        dataset = HotelMontreal()
+        dataset = HotelMontrealDataset()
     elif dataset_name == "hotel_nyc":
-        dataset = HotelNYC()
+        dataset = HotelNYCDataset()
     return dataset
 
 class Dataloader(ABC):    

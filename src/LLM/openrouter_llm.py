@@ -8,13 +8,21 @@ from typing import List, Optional
 
 import requests
 
-from src.LLM.llm import LLM
+from .llm import LLM
 
 
 class OpenRouterLLM(LLM):
-    """
-    LLM client that scores passages via the OpenRouter chat-completion API.
-    Supports expected relevance (ER) and pointwise relevance (PR) scoring modes.
+    """LLM client that produces passage-level relevance scores via OpenRouter.
+
+    The helper supports two scoring modes:
+
+    ``expected_relevance``
+        Requests logits for each ordinal relevance label and returns the
+        expectation under the implied categorical distribution (ER).
+
+    ``pointwise``
+        Requests an integer relevance judgment directly and forwards the score
+        unchanged (PR).
     """
 
     def __init__(
@@ -43,7 +51,7 @@ class OpenRouterLLM(LLM):
 
     def generate(self, prompt: str, temperature: float = 0.0) -> str:
         """
-        Call OpenRouter chat completion endpoint and return the response text.
+        Call the OpenRouter chat-completion endpoint and return the response text.
         """
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -77,6 +85,7 @@ class OpenRouterLLM(LLM):
         raise RuntimeError("OpenRouter request failed unexpectedly.")
 
     def _build_prompt(self, query: str, passages: List[str]) -> str:
+        """Construct the user prompt sent to the OpenRouter model."""
         formatted_passages = "\n".join(
             [f"{idx + 1}. {text}" for idx, text in enumerate(passages)]
         )
@@ -110,6 +119,7 @@ Example format: {{"scores": {{"0": 3, "1": 2, "2": 0}}}}
         return prompt_template.format(query=query, passages=formatted_passages)
 
     def _parse_expected_relevance(self, response: str, num_passages: int) -> List[float]:
+        """Convert JSON logits into expected relevance scores."""
         try:
             parsed = json.loads(response)
             logits_map = parsed["logits"]
@@ -140,6 +150,7 @@ Example format: {{"scores": {{"0": 3, "1": 2, "2": 0}}}}
         return scores
 
     def _parse_pointwise(self, response: str, num_passages: int) -> List[float]:
+        """Extract integer labels from the LLM response in pointwise mode."""
         try:
             parsed = json.loads(response)
             scores_map = parsed["scores"]
@@ -157,9 +168,7 @@ Example format: {{"scores": {{"0": 3, "1": 2, "2": 0}}}}
         cache: Optional[dict] = None,
         update_cache: Optional[str] = None,
     ) -> List[float]:
-        """
-        Score passages for a query, optionally using cached results and persisting updates.
-        """
+        """Score passages for a query using the configured LLM scoring mode."""
         cache_dict = cache if cache is not None else defaultdict(dict)
 
         if cache_dict and query_id is not None and passage_ids is not None:

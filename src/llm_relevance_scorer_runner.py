@@ -4,11 +4,11 @@ from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
 
-from src.Dataset.dataloader import handle_dataset
-from src.Retrieval.retrieval import llm_rerank
-from src.Embedding.embedding import handle_embeddings
-from src.RecUtils.rec_utils import fusion_score, eval_rec, save_results
-from src.LLM.openrouter_llm import OpenRouterLLM
+from .Dataset.dataloader import handle_dataset
+from .Retrieval.retrieval import llm_rerank
+from .Embedding.embedding import handle_embeddings
+from .RecUtils.rec_utils import fusion_score, eval_rec, save_results
+from .LLM.openrouter_llm import OpenRouterLLM
 
 
 def main(
