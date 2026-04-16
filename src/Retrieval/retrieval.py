@@ -10,17 +10,26 @@ from ..LLM.llm import LLM
 
 SAMPLE_STRATEGIES = ["random"]
 
-def calculate_cosine_similarity(query_embeddings, passage_embeddings):
-    dot_product = np.dot(query_embeddings, passage_embeddings.T)
-    return dot_product
+
+def _safe_l2_normalize(embeddings):
+    embeddings = np.asarray(embeddings)
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    return np.divide(
+        embeddings,
+        norms,
+        out=np.zeros_like(embeddings, dtype=float),
+        where=norms != 0,
+    )
 
 def calculate_cosine_similarity(query_embeddings, passage_embeddings):
+    query_embeddings = np.asarray(query_embeddings)
+    passage_embeddings = np.asarray(passage_embeddings)
+
     if query_embeddings.ndim == 1:
         query_embeddings = query_embeddings.reshape(1, -1)
 
-    # Normalize embeddings
-    query_norm = query_embeddings / np.linalg.norm(query_embeddings, axis=1, keepdims=True)
-    passage_norm = passage_embeddings / np.linalg.norm(passage_embeddings, axis=1, keepdims=True)
+    query_norm = _safe_l2_normalize(query_embeddings)
+    passage_norm = _safe_l2_normalize(passage_embeddings)
 
     # Compute cosine similarity
     similarity_matrix = np.dot(query_norm, passage_norm.T)

@@ -1,35 +1,34 @@
 from abc import ABC, abstractmethod
 
-from .datasets import (
-    RestaurantPhiDataset,
-    RestaurantNorDataset,
-    TravelDestDataset,
-    PointRecUSDataset,
-    HotelChicagoDataset,
-    HotelLondonDataset,
-    HotelMontrealDataset,
-    HotelNYCDataset,
-)
-
-
 def handle_dataset(dataset_name):
-    if dataset_name == "restaurant_phi":
-        dataset = RestaurantPhiDataset()
-    elif dataset_name == "restaurant_nor":
-        dataset = RestaurantNorDataset()
-    elif dataset_name == "travel_dest":
-        dataset = TravelDestDataset()
-    elif dataset_name == "point_rec_us":
-        dataset = PointRecUSDataset()
-    elif dataset_name == "hotel_chicago":
-        dataset = HotelChicagoDataset()
-    elif dataset_name == "hotel_london":
-        dataset = HotelLondonDataset()
-    elif dataset_name == "hotel_montreal":
-        dataset = HotelMontrealDataset()
-    elif dataset_name == "hotel_nyc":
-        dataset = HotelNYCDataset()
-    return dataset
+    from .datasets import (
+        HotelChicagoDataset,
+        HotelLondonDataset,
+        HotelMontrealDataset,
+        HotelNYCDataset,
+        PointRecUSDataset,
+        RestaurantNorDataset,
+        RestaurantPhiDataset,
+        TravelDestDataset,
+    )
+
+    datasets = {
+        "hotel_chicago": HotelChicagoDataset,
+        "hotel_london": HotelLondonDataset,
+        "hotel_montreal": HotelMontrealDataset,
+        "hotel_nyc": HotelNYCDataset,
+        "point_rec_us": PointRecUSDataset,
+        "restaurant_nor": RestaurantNorDataset,
+        "restaurant_phi": RestaurantPhiDataset,
+        "travel_dest": TravelDestDataset,
+    }
+
+    try:
+        return datasets[dataset_name]()
+    except KeyError as exc:
+        raise ValueError(
+            f"Unknown dataset '{dataset_name}'. Choose from: {', '.join(sorted(datasets))}"
+        ) from exc
 
 class Dataloader(ABC):    
     @abstractmethod

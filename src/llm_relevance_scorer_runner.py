@@ -16,7 +16,7 @@ def main(
     top_k_passages=3,
     fusion_mode="mean",
     budget=100,
-    embedder_name="all-MiniLM-L6-v2",
+    embedder_name="hashing",
     llm_model_name="openai/gpt-4o",
     scoring_mode="expected_relevance",
     cross_encoder_reranking=False,
@@ -46,7 +46,11 @@ def main(
         passages,
     )
 
-    llm = OpenRouterLLM(model_name=llm_model_name, score_mode=scoring_mode)
+    llm = OpenRouterLLM(
+        model_name=llm_model_name,
+        score_mode=scoring_mode,
+        require_api_key=False,
+    )
     cache_path = f"data/{dataset_name}/cache.csv"
 
     k_values = range(10, 51, 10)

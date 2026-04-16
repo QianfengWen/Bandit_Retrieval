@@ -1,10 +1,22 @@
 import pickle
 import numpy as np
-import torch
 import os
-from sentence_transformers import SentenceTransformer
+
+
+LOCAL_EMBEDDERS = {"hashing", "local-hashing", "hashing-vectorizer"}
 
 def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_path, passage_embeddings_path):
+    if model_name in LOCAL_EMBEDDERS:
+        return create_hashing_embeddings(
+            query_texts,
+            passage_texts,
+            query_embeddings_path,
+            passage_embeddings_path,
+        )
+
+    import torch
+    from sentence_transformers import SentenceTransformer
+
     embedder = SentenceTransformer(model_name)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     embedder.to(device)
@@ -15,6 +27,23 @@ def create_embeddings(model_name, query_texts, passage_texts, query_embeddings_p
     save_embeddings(query_embeddings, passages_embeddings, query_embeddings_path, passage_embeddings_path)
    
     return query_embeddings, passages_embeddings
+
+
+def create_hashing_embeddings(query_texts, passage_texts, query_embeddings_path, passage_embeddings_path):
+    from sklearn.feature_extraction.text import HashingVectorizer
+
+    vectorizer = HashingVectorizer(
+        n_features=384,
+        alternate_sign=False,
+        norm="l2",
+        dtype=np.float32,
+    )
+    query_embeddings = vectorizer.transform(query_texts).toarray().astype(np.float32, copy=False)
+    passage_embeddings = vectorizer.transform(passage_texts).toarray().astype(np.float32, copy=False)
+
+    save_embeddings(query_embeddings, passage_embeddings, query_embeddings_path, passage_embeddings_path)
+
+    return query_embeddings, passage_embeddings
 
 def save_embeddings(query_embeddings, passage_embeddings=None, query_embeddings_path=None, passage_embeddings_path=None):
     os.makedirs(os.path.dirname(query_embeddings_path), exist_ok=True)

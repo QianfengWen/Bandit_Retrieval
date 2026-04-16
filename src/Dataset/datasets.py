@@ -4,11 +4,48 @@ from collections import defaultdict
 from pathlib import Path
 import json
 import unicodedata
+import zipfile
 from typing import Dict, List, Tuple
 
 import pandas as pd
 
 from .dataloader import Dataloader
+
+
+def _ensure_dataset_available(root: Path):
+    """Extract a dataset from bundled data.zip when data/ is not present."""
+    if root.exists():
+        return
+
+    archive_path = Path("data.zip")
+    if not archive_path.exists():
+        raise FileNotFoundError(
+            f"Dataset directory '{root}' does not exist and data.zip was not found."
+        )
+
+    prefix = root.as_posix().rstrip("/") + "/"
+    with zipfile.ZipFile(archive_path) as archive:
+        members = [
+            member
+            for member in archive.infolist()
+            if member.filename.startswith(prefix)
+        ]
+        if not members:
+            raise FileNotFoundError(
+                f"Dataset directory '{root}' was not found inside data.zip."
+            )
+
+        cwd = Path.cwd().resolve()
+        for member in members:
+            member_path = Path(member.filename)
+            if member_path.is_absolute() or ".." in member_path.parts:
+                raise ValueError(f"Unsafe path in data.zip: {member.filename}")
+
+            destination = (cwd / member_path).resolve()
+            if destination != cwd and cwd not in destination.parents:
+                raise ValueError(f"Unsafe path in data.zip: {member.filename}")
+
+            archive.extract(member, path=cwd)
 
 
 class CorpusDataset(Dataloader):
@@ -37,6 +74,7 @@ class CorpusDataset(Dataloader):
 
     def load_dataset(self, cache_path: str | None = None):
         self.cache_path = cache_path or str(self.root / self.cache_filename)
+        _ensure_dataset_available(self.root)
 
         passages: List[str] = []
         passage_dict: Dict[int, List[int]] = {}
@@ -192,6 +230,8 @@ class PointRecUSDataset(Dataloader):
         self.cache_path = self.root / "cache.csv"
 
     def load_dataset(self):
+        _ensure_dataset_available(self.root)
+
         passages: List[str] = []
         passage_dict: Dict[int, List[int]] = {}
         cities: List[str] = []

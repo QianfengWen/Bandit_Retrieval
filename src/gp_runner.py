@@ -1,6 +1,8 @@
 from pathlib import Path
 from collections import defaultdict
+import hashlib
 import json
+import re
 
 import numpy as np
 from tqdm import tqdm
@@ -12,12 +14,28 @@ from .Embedding.embedding import handle_embeddings
 from .RecUtils.rec_utils import fusion_score_gp, eval_rec, save_results
 
 
+def _format_config_filename(configs, max_length=180):
+    safe_parts = []
+    for key, value in configs.items():
+        safe_key = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(key)).strip("-")
+        safe_value = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(value)).strip("-")
+        safe_parts.append(f"{safe_key}={safe_value}")
+
+    filename = "_".join(safe_parts)
+    if len(filename) <= max_length:
+        return filename
+
+    digest = hashlib.sha1(filename.encode("utf-8")).hexdigest()[:12]
+    prefix_length = max_length - len(digest) - 1
+    return f"{filename[:prefix_length].rstrip('_-')}_{digest}"
+
+
 def main(
     dataset_name="travel_dest",
     top_k_passages=3,
     fusion_mode="mean",
     llm_model_name="openai/gpt-4o",
-    embedder_name="all-MiniLM-L6-v2",
+    embedder_name="hashing",
     kernel="rbf",
     llm_budget=100,
     sample_strategy="random",
@@ -61,7 +79,11 @@ def main(
     evaluation_dir.mkdir(parents=True, exist_ok=True)
     retrieval_dir.mkdir(parents=True, exist_ok=True)
 
-    llm = OpenRouterLLM(model_name=llm_model_name, score_mode=scoring_mode)
+    llm = OpenRouterLLM(
+        model_name=llm_model_name,
+        score_mode=scoring_mode,
+        require_api_key=False,
+    )
     cache = dataset.load_cache()
     update_cache = f"data/{dataset_name}/cache.csv"
 
@@ -166,7 +188,7 @@ def main(
         "tau": tau_value,
     }
 
-    config_str = "_".join([f"{k}={v}" for k, v in configs.items()])
+    config_str = _format_config_filename(configs)
     evaluation_path = evaluation_dir / f"{config_str}.csv"
     retrieval_results_path = retrieval_dir / f"{config_str}.json"
 

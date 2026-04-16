@@ -32,6 +32,7 @@ class OpenRouterLLM(LLM):
         max_tokens: int = 16_000,
         score_mode: str = "expected_relevance",
         label_values: Optional[List[int]] = None,
+        require_api_key: bool = True,
     ):
         super().__init__(model_name=model_name)
         self.max_retries = max_retries
@@ -44,7 +45,7 @@ class OpenRouterLLM(LLM):
             raise ValueError("score_mode must be 'expected_relevance' or 'pointwise'")
 
         self.api_key = os.getenv("OPENROUTER_API_KEY")
-        if not self.api_key:
+        if require_api_key and not self.api_key:
             raise EnvironmentError(
                 "OPENROUTER_API_KEY environment variable is not set."
             )
@@ -53,6 +54,11 @@ class OpenRouterLLM(LLM):
         """
         Call the OpenRouter chat-completion endpoint and return the response text.
         """
+        if not self.api_key:
+            raise EnvironmentError(
+                "OPENROUTER_API_KEY environment variable is not set."
+            )
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -171,34 +177,52 @@ Example format: {{"scores": {{"0": 3, "1": 2, "2": 0}}}}
         """Score passages for a query using the configured LLM scoring mode."""
         cache_dict = cache if cache is not None else defaultdict(dict)
 
-        if cache_dict and query_id is not None and passage_ids is not None:
-            try:
-                cached_scores = cache_dict[query_id]
-                target_scores = [cached_scores[p_id] for p_id in passage_ids]
-                return target_scores
-            except KeyError:
-                pass
-
         if query_id is not None and query_id not in cache_dict:
             cache_dict[query_id] = {}
 
-        prompt = self._build_prompt(query, passages)
+        scores = [None] * len(passages)
+        missing_indices = list(range(len(passages)))
+
+        if query_id is not None and passage_ids is not None:
+            cached_scores = cache_dict.get(query_id, {})
+            missing_indices = []
+            for idx, passage_id in enumerate(passage_ids):
+                if passage_id in cached_scores:
+                    scores[idx] = float(cached_scores[passage_id])
+                else:
+                    missing_indices.append(idx)
+
+        if not missing_indices:
+            return scores
+
+        if not self.api_key:
+            for idx in missing_indices:
+                scores[idx] = -1.0
+            return scores
+
+        missing_passages = [passages[idx] for idx in missing_indices]
+        prompt = self._build_prompt(query, missing_passages)
         response = self.generate(prompt)
 
         if self.score_mode == "expected_relevance":
-            scores = self._parse_expected_relevance(response, len(passages))
+            missing_scores = self._parse_expected_relevance(response, len(missing_passages))
         else:
-            scores = self._parse_pointwise(response, len(passages))
+            missing_scores = self._parse_pointwise(response, len(missing_passages))
+
+        for idx, score in zip(missing_indices, missing_scores):
+            scores[idx] = score
 
         if (
             update_cache
             and query_id is not None
             and passage_ids is not None
-            and len(passage_ids) == len(scores)
+            and len(passage_ids) == len(passages)
         ):
             cache_dict.setdefault(query_id, {})
             new_entries = []
-            for p_id, score in zip(passage_ids, scores):
+            for idx in missing_indices:
+                p_id = passage_ids[idx]
+                score = scores[idx]
                 previous = cache_dict[query_id].get(p_id)
                 cache_dict[query_id][p_id] = score
                 if previous is None:

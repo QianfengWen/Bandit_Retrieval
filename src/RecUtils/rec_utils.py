@@ -59,7 +59,7 @@ def fusion_score_gp(
 
     id_to_index = {pid: idx for idx, pid in enumerate(passage_ids)}
     _, global_scores = gp.get_top_k(passage_embeddings, k_retrieval, return_scores=True)
-    cutoff = global_scores[-1] if global_scores else float("-inf")
+    cutoff = global_scores[-1] if len(global_scores) > 0 else float("-inf")
 
     city_scores = {}
     for city_id, city_passage_ids in passage_dict.items():

@@ -5,6 +5,7 @@ __pycache__/
 
 # igonore data folder
 data/
+output/
 plots/
 
 # C extensions

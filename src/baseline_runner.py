@@ -14,7 +14,7 @@ def main(
     dataset_name="travel_dest",
     top_k_passages=3,
     fusion_mode="mean",
-    embedder_name="all-MiniLM-L6-v2",
+    embedder_name="hashing",
 ):
     """Run the dense retrieval baseline and persist evaluation metrics."""
     dataset = handle_dataset(dataset_name)
